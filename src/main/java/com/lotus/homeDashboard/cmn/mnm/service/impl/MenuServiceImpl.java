@@ -57,6 +57,7 @@ public class MenuServiceImpl implements MenuService {
 	}
 	
 	private DataMap<String,Object> userMenuEntityToMap(UserMenuEntity entity) {
+		
 		DataMap<String,Object> map = new DataMap<>();
 		
 		map.put("menuId", entity.getMenuId());
