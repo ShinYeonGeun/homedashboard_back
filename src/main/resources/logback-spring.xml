@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    
+    <springProperty name="filePath" source="logging.file.path"/>
+    <springProperty name="fileName" source="logging.file.name"/>
+    <springProperty name="bizLogLevel" source="logging.level.biz"/>
+    <springProperty name="rootLogLevel" source="logging.level.root"/>
+    
+<!--    <property name = "logDir" value="${filePath}" />-->
+<!--    <property name = "logName" value="${fileName}" />-->
+    
+    <!-- 로그 출력 형식 설정 -->
+    <conversionRule conversionWord="clr" converterClass="org.springframework.boot.logging.logback.ColorConverter" />
+    <conversionRule conversionWord="wex" converterClass="org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter" />
+    
+    
+    <!-- Thread 명 나오는 패턴 -->
+<!--    <property name="CONSOLE_LOG_PATTERN" value="${CONSOLE_LOG_PATTERN:-%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wex}}" />-->
+    <property name="CONSOLE_LOG_PATTERN" value="${CONSOLE_LOG_PATTERN:-%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} [%clr(${LOG_LEVEL_PATTERN:-%5p})] [%yellow(%X{UUID})]{faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wex}}" />
+    <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [${LOG_LEVEL_PATTERN:-%5p}] [%X{UUID}] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wex}" />
+    
+    <!-- 루트 로거 설정 -->
+    <include resource="org/springframework/boot/logging/logback/base.xml" />
+
+    <!-- 콘솔 출력 설정 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+<!--     파일 출력 설정 -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${filePath}/${fileName}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${filePath}/history/${fileName}_%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+<!--            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [${LOG_LEVEL_PATTERN:-%5p}] [%X{UUID}] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wex}</pattern>-->
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 로거 설정 -->
+<!--    <logger name="org.hibernate" level="ERROR" />-->
+<!--    <logger name="org.hibernate.SQL" level="DEBUG" additivity="false"/>   -->
+<!--    <logger name="jdbc.sqltiming" level="DEBUG" additivity="false" />-->
+<!--    <logger name="jdbc.sqlonly" level="DEBUG" additivity="false" />-->
+    <springProfile name="local">
+        <!-- 쿼리 파라미터 로그 -->
+        <logger name="org.hibernate.orm.jdbc.bind" level="TRACE" additivity="false">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="FILE" />
+        </logger> 
+        
+        <!-- 쿼리 로그 -->
+        <logger name="org.hibernate.SQL" level="TRACE" additivity="false">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="FILE" />
+        </logger>   
+
+        <logger name="com.lotus.homeDashboard" level="${bizLogLevel}" additivity="false">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="FILE" />
+        </logger>   
+        <logger name="org.springframework" level="ERROR" additivity="false">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="FILE" />
+        </logger>
+        <root level="${rootLogLevel}">
+            <appender-ref ref="CONSOLE" />
+        </root>
+    </springProfile>
+<!--        <root level="INFO" additivity="false">-->
+<!--            <appender-ref ref="CONSOLE" />-->
+<!--        </root>-->
+
+</configuration>
