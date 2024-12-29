@@ -66,3 +66,19 @@
 2024-12-29 22:32:55.940 [ WARN] [] org.hibernate.mapping.RootClass          : HHH000038: Composite-id class does not override equals(): com.lotus.homeDashboard.cmn.usr.entity.UserGroupKeyEntity
 2024-12-29 22:32:55.940 [ WARN] [] org.hibernate.mapping.RootClass          : HHH000039: Composite-id class does not override hashCode(): com.lotus.homeDashboard.cmn.usr.entity.UserGroupKeyEntity
 2024-12-29 22:32:55.989 [ INFO] [] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2024-12-29 22:35:40.924 [ INFO] [] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown initiated...
+2024-12-29 22:35:40.925 [ INFO] [] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown completed.
+2024-12-29 22:35:41.155 [ INFO] [] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2024-12-29 22:35:41.156 [ INFO] [] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.25]
+2024-12-29 22:35:41.163 [ INFO] [] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2024-12-29 22:35:41.174 [ INFO] [] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2024-12-29 22:35:41.175 [ INFO] [] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2024-12-29 22:35:41.192 [ INFO] [] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Starting...
+2024-12-29 22:35:41.229 [ INFO] [] com.zaxxer.hikari.pool.HikariPool        : HikariPool-4 - Added connection org.postgresql.jdbc.PgConnection@e507755
+2024-12-29 22:35:41.229 [ INFO] [] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Start completed.
+2024-12-29 22:35:41.234 [ WARN] [] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2024-12-29 22:35:41.256 [ WARN] [] org.hibernate.mapping.RootClass          : HHH000038: Composite-id class does not override equals(): com.lotus.homeDashboard.cmn.ccd.entity.CommonCodeDetailKeyEntity
+2024-12-29 22:35:41.256 [ WARN] [] org.hibernate.mapping.RootClass          : HHH000039: Composite-id class does not override hashCode(): com.lotus.homeDashboard.cmn.ccd.entity.CommonCodeDetailKeyEntity
+2024-12-29 22:35:41.256 [ WARN] [] org.hibernate.mapping.RootClass          : HHH000038: Composite-id class does not override equals(): com.lotus.homeDashboard.cmn.usr.entity.UserGroupKeyEntity
+2024-12-29 22:35:41.256 [ WARN] [] org.hibernate.mapping.RootClass          : HHH000039: Composite-id class does not override hashCode(): com.lotus.homeDashboard.cmn.usr.entity.UserGroupKeyEntity
+2024-12-29 22:35:41.307 [ INFO] [] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
