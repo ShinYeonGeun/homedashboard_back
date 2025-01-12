@@ -38,6 +38,10 @@ public class CommonCodeDslRepositoryImpl implements CommonCodeDslRepository {
 				.leftJoin(commonCodeDetailEntity)
 				.on(commonCodeEntity.code.eq(commonCodeDetailEntity.code));
 		
+		if(!codeList.isEmpty()) {
+			conditions.and(commonCodeEntity.code.in(codeList));
+		}
+		
 		if(!StringUtil.isEmpty(codeDelYn)) {
 			conditions.and(commonCodeEntity.delYn.eq(codeDelYn));
 		}
