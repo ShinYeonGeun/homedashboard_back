@@ -46,7 +46,7 @@ public class TrnLogEntity {
 	@Column
 	private String uid;
 	
-	@Column
+	@Column(columnDefinition = "TEXT")
 	private String content;
 	
 }

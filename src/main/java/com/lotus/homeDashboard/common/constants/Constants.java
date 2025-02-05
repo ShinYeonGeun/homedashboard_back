@@ -15,4 +15,11 @@ public class Constants {
 	public static final String ESCAPE_DOT = "\\.";
 	
 	public static final String AUTH = "Bearer";
+	
+	public static final long SVC_TIMEOUT = 30000L; //타임아웃시간
+	public static final long SVC_TIMEOUT_INF = -1L; //타임아웃시간 무한
+	public static final long SVC_TIMEOUT_MIN = 0L; //타임아웃시간 최솟값
+	
+	public static final int SVC_INVOKER_POOL_SIZE = 10; //serviceInvoker threadpool size
+	
 }

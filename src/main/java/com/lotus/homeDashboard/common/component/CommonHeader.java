@@ -19,6 +19,7 @@ public class CommonHeader {
 	private String trnUserId;
 	private String requestIp;
 	private String accessToken;
+	private String requestUri;
 	
 	private String authorization;
 }

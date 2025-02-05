@@ -30,11 +30,14 @@ public class CommonCodeServiceImpl implements CommonCodeService {
 		List<DataMap<String, Object>> list = new ArrayList<>();
 		DataMap<String, Object> params = request.getParameter();
 		DataMap<String, Object> result = new DataMap<>();
+		List<String> paramCodeList = null;
 		
 		List<Tuple> tuples = null;
 		int recodeCount = 0;
 		
-		tuples = commonCodeDslRepository.findAllCommonCodeNDetail(((List<String>) params.get("codeList"))
+		paramCodeList = params.get("codeList") == null ? new ArrayList<>():((List<String>) params.get("codeList"));
+		
+		tuples = commonCodeDslRepository.findAllCommonCodeNDetail( paramCodeList
 																  , params.getString("codeDelYn")
 																  , params.getString("codeDetailDelYn"));
 		recodeCount = tuples.size();

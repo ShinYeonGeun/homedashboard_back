@@ -1,5 +1,7 @@
 package com.lotus.homeDashboard.common.interceptor;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -8,6 +10,7 @@ import java.util.UUID;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.util.ContentCachingRequestWrapper;
@@ -28,7 +31,6 @@ import com.lotus.homeDashboard.common.exception.LoginException;
 import com.lotus.homeDashboard.common.jwt.JWTProvider;
 import com.lotus.homeDashboard.common.service.TrnLogService;
 import com.lotus.homeDashboard.common.utils.CommonUtil;
-import com.lotus.homeDashboard.common.utils.MessageUtil;
 import com.lotus.homeDashboard.common.utils.StringUtil;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,15 +39,13 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class PreProcessInterceptor implements HandlerInterceptor {
-	
-		
+
 	@Autowired
 	private TrnLogService trnLogService;
 	
 	@Autowired
 	private JWTProvider jWTProvider;
 	
-
 	@Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
 		log.debug("__DBGLOG__ 전체 선처리 시작");
@@ -61,6 +61,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			// preflight 시 처리 안함
 			//===================================================================================
 			if(request.getMethod().equals(HttpMethod.OPTIONS.name())) {
+				log.error("@@@@@@@@@@@ preflight @@@@@@@@@@@@");
 				return true;
 			}
 			
@@ -104,7 +105,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 				tokenInfo = jWTProvider.validate(header.getAccessToken());
 				
 				if(tokenInfo == null) {
-					throw new LoginException(MessageUtil.getMessage("login_need"));
+					throw new LoginException("login_need");
 				}
 				
 				response.setHeader(Keys.ACCESS_TOKEN.getKey(), header.getAccessToken());
@@ -116,7 +117,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			//===================================================================================
 			logEntity.setUid(header.getTrnUserId());
 			logEntity.setResultCode(ResultCode.SUCCESS.getCode());
-			trnLogService.saveTrnLog(logEntity);
+			trnLogService.saveTrnLogWithEntity(logEntity);
 			
 		}catch(JWTVerificationException e) {
 			//JWTVerificationException
@@ -127,12 +128,12 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 				msgKey = "login_need";
 			}
 			log.error("__ERRLOR__ 전체 선처리 토큰 검증 오류", e);
-			throw new LoginException(MessageUtil.getMessage(msgKey));
+			throw new LoginException(msgKey);
 		}catch(Exception e) {
 			log.error("__ERRLOR__ 전체 선처리 오류", e);
 			logEntity.setResultCode(ResultCode.ERROR.getCode());
 			logEntity.setContent(e.toString());
-			trnLogService.saveTrnLog(logEntity);
+			trnLogService.saveTrnLogWithEntity(logEntity);
     		throw e;
 		}finally {
 			
@@ -143,10 +144,10 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 
     @Override
     public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
-    	log.debug("__DBGLOG__ 전체 후처리 시작");
+    	log.debug("__DBGLOG__ postHandle 전체 후처리 시작");
         log.debug("Request URI ===> " + request.getRequestURI());
-        
-        log.debug("__DBGLOG__ 전체 후처리 종료");
+
+        log.debug("__DBGLOG__ postHandle 전체 후처리 종료");
         HandlerInterceptor.super.postHandle(request, response, handler, modelAndView);
     }
     
@@ -169,7 +170,11 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 	    	log.debug("__DBGLOG__ Response Status: [{}]", res.getStatus());
 	    	log.debug("__DBGLOG__ Response content: [{}]", new String(res.getContentAsByteArray()));
 	    	
-    	
+	    	if(request.getMethod().equals(HttpMethod.OPTIONS.name())) {
+				log.error("@@@@@@@@@@@ preflight @@@@@@@@@@@@");
+				return;
+			}
+	    	    	
 	    	//===================================================================================
 	    	// Body 재사용을 위해 Wrapping
 	    	//===================================================================================
@@ -177,6 +182,13 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 	    		rs = new ObjectMapper().readValue(res.getContentAsByteArray(), ResultSet.class);
 	    	}else {
 	    		rs = new ResultSet();
+	    	}
+	    	
+	    	//===================================================================================
+	    	// BizException 발생한 경우 GlobalExceptionHandler에서 로그 저장함.
+	    	//===================================================================================
+	    	if(!ResultCode.SUCCESS.getCode().equals(rs.getResultCd())) {
+	    		return;
 	    	}
 	    	
 	    	//===================================================================================
@@ -202,21 +214,28 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 	        if (ex == null) {
 	        	log.debug("__DBGLOG__ 정상 {}", rs);
 	        	logEntity.setResultCode(rs.getResultCd());
-	        }else {
-	        	// 오류가 발생한 경우에 대한 처리
-	            // 예를 들어, 로깅이나 특정한 오류 페이지로 리다이렉션 등을 수행할 수 있음
-	            //response.sendRedirect("/error"); // 예시: "/error"로 리다이렉트
-	        	log.error("__ERRLOG__ 오류 {}", ex);
-	        	logEntity.setResultCode(ResultCode.ERROR.getCode());
-	        	rs.setResultCd(ResultCode.ERROR.getCode());
-	        	rs.setPayload(ex);
+	        	trnLogService.saveTrnLogWithEntity(logEntity);
 	        }
-	        
-	        trnLogService.saveTrnLog(logEntity);
+//	    	else {
+//	        	// 오류가 발생한 경우에 대한 처리
+//	            // 예를 들어, 로깅이나 특정한 오류 페이지로 리다이렉션 등을 수행할 수 있음
+//	            //response.sendRedirect("/error"); // 예시: "/error"로 리다이렉트
+//	        	log.error("__ERRLOG__2 오류", ex);
+//	        	
+//	        	StringWriter sw = new StringWriter();
+//	            PrintWriter pw = new PrintWriter(sw);
+//	            ex.printStackTrace(pw);
+//	            
+//	            String stackTraceString = sw.toString();
+//	        	
+//	        	logEntity.setResultCode(ResultCode.ERROR.getCode());
+//	        	logEntity.setContent(stackTraceString);
+//	        }
+//	        
+//	        trnLogService.saveTrnLogWithEntity(logEntity);
 	        
     	}catch(Exception e) {
     		log.error("__ERRLOR__ 전체 후처리 오류", e);
-    		throw e;
     	}finally {
     		log.debug("__DBGLOG__ 전체 후처리 종료");
 		}
@@ -271,6 +290,9 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			
 			//IP
 			header.setRequestIp(CommonUtil.getRequestIP(req));
+			
+			//uri
+			header.setRequestUri(req.getRequestURI());
 
     		//===================================================================================
     		// 토큰 취득

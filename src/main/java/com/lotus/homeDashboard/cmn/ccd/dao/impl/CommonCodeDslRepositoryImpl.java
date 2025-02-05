@@ -3,6 +3,7 @@ package com.lotus.homeDashboard.cmn.ccd.dao.impl;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import com.lotus.homeDashboard.cmn.ccd.dao.CommonCodeDslRepository;
@@ -49,6 +50,8 @@ public class CommonCodeDslRepositoryImpl implements CommonCodeDslRepository {
 		if(!StringUtil.isEmpty(codeDetailDelYn)) {
 			conditions.and(commonCodeDetailEntity.delYn.eq(codeDetailDelYn));
 		}
+		
+		select.orderBy(commonCodeEntity.code.asc(), commonCodeDetailEntity.codeVal.asc());
 		
 		//조건추가
 		select.where(conditions);

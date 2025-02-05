@@ -43,6 +43,8 @@ public class LoginController {
 			
 //			//사용자정보 리턴하면 안됨.
 //			loginServiceResult.setPayload(null);
+			
+			
 			return loginServiceResult;
 			
 		}catch (Exception e) {
