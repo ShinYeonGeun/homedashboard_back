@@ -26,15 +26,20 @@ public class CommonCodeServiceImpl implements CommonCodeService {
 	private CommonCodeDslRepository commonCodeDslRepository;
 
 	@Override
-	public DataMap<String, Object> inqAllCommonCodeNDetail(Request request) {
+	public DataMap<String, Object> inqCommonCodeNAllDetail(Request request) {
 		List<DataMap<String, Object>> list = new ArrayList<>();
 		DataMap<String, Object> params = request.getParameter();
 		DataMap<String, Object> result = new DataMap<>();
+		List<String> paramCodeList = null;
 		
 		List<Tuple> tuples = null;
 		int recodeCount = 0;
 		
-		tuples = commonCodeDslRepository.findAllCommonCodeNDetail(((List<String>) params.get("codeList")), params.getString("codeDelYn"), params.getString("codeDetailDelYn"));
+		paramCodeList = params.get("codeList") == null ? new ArrayList<>():((List<String>) params.get("codeList"));
+		
+		tuples = commonCodeDslRepository.findAllCommonCodeNDetail( paramCodeList
+																  , params.getString("codeDelYn")
+																  , params.getString("codeDetailDelYn"));
 		recodeCount = tuples.size();
 		
 		log.debug("tuples {}", tuples);
@@ -45,15 +50,7 @@ public class CommonCodeServiceImpl implements CommonCodeService {
 			DataMap<String, Object> codeDetailInfo = null;
 			CommonCodeEntity commonCode = tuple.get(QCommonCodeEntity.commonCodeEntity);
 			CommonCodeDetailEntity commonCodeDetailEntity = tuple.get(QCommonCodeDetailEntity.commonCodeDetailEntity);
-			
-			//동일한 키로 생성된 데이터 찾음.
-//			for(DataMap<String, Object> code : list) {
-//				if(code.getString("code", "").equals(commonCode.getCode())) {
-//					log.debug("__DBGLOG__ code 찾음 [{}]", commonCode.getCode());
-//					codeInfo = code;
-//					break;
-//				}
-//			}
+
 			if(result.containsKey(commonCode.getCode())) {
 				codeInfo = (DataMap<String, Object>) result.get(commonCode.getCode());
 			}

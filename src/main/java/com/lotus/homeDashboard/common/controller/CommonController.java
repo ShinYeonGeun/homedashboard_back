@@ -22,6 +22,7 @@ public class CommonController {
 	
 	@PostMapping("/callService")
 	public ResultSet callService(HttpServletRequest request) throws Exception {
+		
 		return trnCdService.executeService(request);
 	}
 	

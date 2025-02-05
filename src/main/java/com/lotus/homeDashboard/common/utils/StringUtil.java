@@ -49,4 +49,41 @@ public class StringUtil {
 		
 		return false;
 	}
+	
+	public static String lpad(String input, int length, String padChar) {
+	    if (input.length() >= length) {
+	        return input; // 이미 원하는 길이를 초과하면 그대로 반환
+	    }
+	    int padLength = length - input.length();
+	    StringBuilder padding = new StringBuilder();
+	    for (int i = 0; i < padLength; i++) {
+	        padding.append(padChar);
+	    }
+	    return padding.append(input).toString(); // 패딩 + 입력 문자열
+	}
+	
+	public static String rpad(String input, int length, String padChar) {
+	    if (input.length() >= length) {
+	        return input; // 이미 원하는 길이를 초과하면 그대로 반환
+	    }
+	    int padLength = length - input.length();
+	    StringBuilder padding = new StringBuilder();
+	    for (int i = 0; i < padLength; i++) {
+	        padding.append(padChar);
+	    }
+	    return input + padding.toString(); // 입력 문자열 + 패딩
+	}
+	
+	// 문자열을 가변 인자로 받아 합치는 함수
+    public static String concat(String... strings) {
+        StringBuilder result = new StringBuilder();
+
+        for (String str : strings) {
+            if (str != null) { // null 체크
+                result.append(str);
+            }
+        }
+
+        return result.toString();
+    }
 }

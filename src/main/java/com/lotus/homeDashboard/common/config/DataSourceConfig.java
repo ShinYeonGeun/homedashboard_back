@@ -14,6 +14,8 @@ import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 
+import com.lotus.homeDashboard.common.utils.EncryptUtil;
+
 @Configuration
 @EnableJpaRepositories(basePackages = "com.lotus.homeDashboard")
 public class DataSourceConfig {
@@ -23,12 +25,13 @@ public class DataSourceConfig {
 
     @Bean
     public DataSource dataSource() {
-    	System.out.println("___DBGLOG " + env.getProperty("spring.datasource.driver-class-name"));
+//    	System.out.println("___DBGLOG " + EncryptUtil.encryptAES256("si!!635241", "DBPASSWORD"));
+//    	System.out.println("___DBGLOG " + EncryptUtil.decryptAES256("pp8Ow2s2MdEdRm6VSaQDyQ==", "DBPASSWORD"));
         return DataSourceBuilder.create()
                 .driverClassName(env.getProperty("spring.datasource.driver-class-name"))
                 .url(env.getProperty("spring.datasource.url"))
                 .username(env.getProperty("spring.datasource.username"))
-                .password(env.getProperty("spring.datasource.password"))
+                .password(EncryptUtil.decryptAES256(env.getProperty("spring.datasource.password"), "DBPASSWORD"))
                 .build();
     }
 
