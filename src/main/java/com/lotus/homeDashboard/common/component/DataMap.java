@@ -1,9 +1,9 @@
 package com.lotus.homeDashboard.common.component;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
-import com.lotus.homeDashboard.common.utils.StringUtil;
 
 public class DataMap <K,V> extends HashMap<K, V> {
 	
@@ -26,6 +26,7 @@ public class DataMap <K,V> extends HashMap<K, V> {
 	}
 
 	public String getString(K k) {
+		
 		V v = super.get(k);
 		
 		if(v == null) {
@@ -36,16 +37,78 @@ public class DataMap <K,V> extends HashMap<K, V> {
 	}
 	
 	public String getString(K k, String defaultValue) {
-		return StringUtil.evl(this.getString(k), defaultValue);
+		return this.getString(k) == null ? defaultValue:this.getString(k);
 	}
 
 	public int getInt(K k) {
-		V v = super.get(k);
 		
-		if(v == null) {
+		if(super.get(k) == null) {
 			throw new NullPointerException();
 		}
 		
 		return Integer.valueOf(this.getString(k));
 	}
+	
+	public int getInt(K k, int defaultValue) {
+		
+		try {
+			return this.getInt(k);
+		} catch (NullPointerException npe) {
+			return defaultValue;
+		}
+	}
+	
+	public long getLong(K k) {
+		
+		if(super.get(k) == null) {
+			throw new NullPointerException();
+		}
+		
+		return Long.valueOf(this.getString(k));
+	}
+	
+	public long getLong(K k, long defaultValue) {
+		
+		try {
+			return this.getLong(k);
+		} catch (NullPointerException npe) {
+			return defaultValue;
+		}
+	}
+	
+	public BigDecimal getBigDecimal(K k) {
+		
+		if(super.get(k) == null) {
+			throw new NullPointerException();
+		}
+		
+		return new BigDecimal(this.getString(k));
+	}
+	
+	public BigDecimal getBigDecimal(K k, BigDecimal defaultValue) {
+		
+		try {
+			return this.getBigDecimal(k);
+		} catch (NullPointerException npe) {
+			return defaultValue;
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	 public <T extends List<?>> T getList(K key) {
+       Object value = super.get(key);
+       if (value instanceof List<?>) {
+           return (T) value;
+       }
+       return null;
+   }
+	
+	@SuppressWarnings("unchecked")
+	 public <T extends Map<?, ?>> T getMap(K key) {
+       Object value = super.get(key);
+       if (value instanceof Map<?, ?>) {
+           return (T) value;
+       }
+       return null;
+   }
 }

@@ -53,8 +53,15 @@ public class ServiceInvoker {
 		
 		ResultSet result = null;
 		Future<ResultSet> future = null;
+		DefaultTransactionDefinition def = null;
+		TransactionStatus status = null;
 		
 		try {
+			
+			def = new DefaultTransactionDefinition();
+	        def.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
+	        
+	        status = transactionManager.getTransaction(def);
 			
 			Callable<ResultSet> task = () -> {
 				
@@ -64,7 +71,7 @@ public class ServiceInvoker {
 				Class<?> clazz = null;
 				Class<?>[] parameterTypes = null;
 				Object serviceResult = null;
-				DataMap<String, Object> params = null; 
+				//DataMap<String, Object> params = null; 
 				
 				try {
 					
@@ -76,7 +83,7 @@ public class ServiceInvoker {
 					method = clazz.getMethod(methodName, parameterTypes);
 					
 					log.debug("__DBGLOG__ {}", serviceName + "." + methodName + " START");
-					log.debug("Parameter : {}", params);
+					log.debug("Parameter : {}", request.getParameter());
 					
 					serviceResult = method.invoke(bean, request);
 					
@@ -92,7 +99,6 @@ public class ServiceInvoker {
 					
 				}catch(BizException be) {
 					log.error("__ERRLOG__ invoker11 invokeOrThrow bizException", be);
-					log.error("__ERRLOG__ invoker11 invokeOrThrow bizException {}", be.getMessage());
 					throw be;
 				}catch(InvocationTargetException ive) {
 					
@@ -119,14 +125,36 @@ public class ServiceInvoker {
 				result = future.get(timeout, TimeUnit.MILLISECONDS);
 			}
 			
+			transactionManager.commit(status);
+			
 		}catch (TimeoutException e) {
 			log.error("__ERRLOG__ invoker Timeout Exception {}", e);
 			future.cancel(true);
+			
+			if (status != null && !status.isCompleted()) { // 트랜잭션이 완료되지 않았다면 롤백
+		        transactionManager.rollback(status);
+		    }
+			
 			throw new BizException("service_timeout", e);
 		}catch(BizException be) {
 			log.error("__ERRLOG__ invoker111 BizException {}", be);
+			log.error("__ERRLOG__ status : [{}]", status);
+			log.error("__ERRLOG__ status : [{}]", status.isCompleted());
+			if (status != null && !status.isCompleted()) { // 트랜잭션이 완료되지 않았다면 롤백
+		        transactionManager.rollback(status);
+		    }
+			
 			throw be;
 		}catch(ExecutionException e) {
+			
+			log.error("__ERRLOG__ status : [{}]", status);
+			log.error("__ERRLOG__ status : [{}]", status.isCompleted());
+			
+			if (status != null && !status.isCompleted()) { // 트랜잭션이 완료되지 않았다면 롤백
+				log.error("__ERRLOG__ status rollback");
+		        transactionManager.rollback(status);
+		    }
+			
 			if(e.getCause() instanceof BizException) {
 				log.error("__ERRLOG__ invoker111 ExecutionException BizException {}", e);
 				log.error("__ERRLOG__ invoker111 ExecutionException BizException2 {}", ((BizException) e.getCause()).getMessage());
@@ -136,7 +164,11 @@ public class ServiceInvoker {
 				throw new BizException("service_invoke_err", e);
 			}
 		}catch(Exception e) {
-
+			
+			if (status != null && !status.isCompleted()) { // 트랜잭션이 완료되지 않았다면 롤백
+		        transactionManager.rollback(status);
+		    }
+			
 			if(e instanceof BizException) {
 				log.error("__ERRLOG__ invoker111 BizException {}", e);
 				throw (BizException) e;
@@ -151,12 +183,12 @@ public class ServiceInvoker {
 		return result;
 	}
 	
-	
 	public ResultSet invoke(String serviceName, String methodName, Request request) {
 		return this.invoke(serviceName, methodName, request, Constants.SVC_TIMEOUT_INF);
 	}
 	
 	public ResultSet invoke(String serviceName, String methodName, Request request, long timeout) {
+		
 		ResultSet rs = new ResultSet();
 		
 		try {
@@ -169,10 +201,8 @@ public class ServiceInvoker {
 		}catch(InvocationTargetException ive) {
 			
 			if(ive.getTargetException() instanceof BizException) {
-				log.error("__ERRLOG__ invoke 22 InvocationTargetException BizException ");
 				throw (BizException) ive.getTargetException();
 			}else {
-				log.error("__ERRLOG__ invoke 22 InvocationTargetException ");
 				throw new BizException("service_invoke_err", ive);
 			}
 			
@@ -213,15 +243,12 @@ public class ServiceInvoker {
 			rs = this.invokeOrThrow(serviceName, methodName, request, timeout);
 			
 		}catch(BizException be) {
-			log.error("__ERRLOG__ invoke 33 BizException ");
 			throw be;	
 		}catch(InvocationTargetException ive) {
 			
 			if(ive.getTargetException() instanceof BizException) {
-				log.error("__ERRLOG__ invoke 33 InvocationTargetException BizException ");
 				throw (BizException) ive.getTargetException();
 			}else {
-				log.error("__ERRLOG__ invoke 33 InvocationTargetException ");
 				throw new BizException("service_invoke_err", ive);
 			}
 			

@@ -24,7 +24,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class EncryptUtil {
 	
-	private static final byte[] iv = "HOMEDASHBOARD===".getBytes();
+	private static final byte[] IV = "HOMEDASHBOARD===".getBytes();
+	private static final String AES_KEY = "HOMEDASHBOARD-AESKEY";
 	
 	public static String encryptSHA256(String value, String salt) {
 		MessageDigest md = null;
@@ -38,6 +39,10 @@ public class EncryptUtil {
 			e.printStackTrace();
 		}
 		return hex;
+	}
+	
+	public static String encryptAES256(String value) {
+		return EncryptUtil.encryptAES256(value, EncryptUtil.AES_KEY);
 	}
 	
 	public static String encryptAES256(String value, String key) {
@@ -54,7 +59,7 @@ public class EncryptUtil {
             secretKey = new SecretKeySpec(StringUtil.rpad(key, 32, "=").getBytes(), "AES");
             
 			cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			ivParameter = new IvParameterSpec(iv);
+			ivParameter = new IvParameterSpec(IV);
 			cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameter);
 			
 			cipherText = cipher.doFinal(value.getBytes());
@@ -83,6 +88,10 @@ public class EncryptUtil {
 		return result;
 	}
 	
+	public static String decryptAES256(String encValue) {
+		return EncryptUtil.decryptAES256(encValue, EncryptUtil.AES_KEY);
+	}
+	
 	public static String decryptAES256(String encValue, String key) {
 		Cipher cipher = null;
 		byte[] plainText = null;
@@ -96,7 +105,7 @@ public class EncryptUtil {
             secretKey = new SecretKeySpec(StringUtil.rpad(key, 32, "=").getBytes(), "AES");
             
 			cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			ivParameter = new IvParameterSpec(iv);
+			ivParameter = new IvParameterSpec(IV);
 			cipher.init(Cipher.DECRYPT_MODE, secretKey, ivParameter);
 			
 			plainText = cipher.doFinal(Base64.getDecoder().decode(encValue));

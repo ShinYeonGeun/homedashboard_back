@@ -2,9 +2,12 @@ package com.lotus.homeDashboard.cmn.usr.constants;
 
 public class UserConstants {
 	
+	public static int MAX_PSWD_ERR_CNT = 5;
+	
 	public enum USER_GROUP_CODE {
 //		00	Admin	관리자
 //		99	일반사용자	일반사용자
+		//TODO 게스트 추가예정
 		ADMIN("00")
 		, GENERAL("99")
 		;

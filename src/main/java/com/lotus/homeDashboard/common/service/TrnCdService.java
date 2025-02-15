@@ -12,4 +12,11 @@ public interface TrnCdService {
 	
 	public DataMap<String, Object> inqTrnCdList(Request request);
 	
+	public DataMap<String, Object> inqCntTrnCd(Request request);
+	
+	public DataMap<String, Object> createTrnCd(Request request);
+	
+	public DataMap<String, Object> updateTrnCd(Request request);
+	
+	public DataMap<String, Object> deleteTrnCd(Request request);
 }

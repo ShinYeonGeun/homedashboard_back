@@ -33,14 +33,14 @@ public class CommonCodeServiceImpl implements CommonCodeService {
 		List<String> paramCodeList = null;
 		
 		List<Tuple> tuples = null;
-		int recodeCount = 0;
+		//int recodeCount = 0;
 		
-		paramCodeList = params.get("codeList") == null ? new ArrayList<>():((List<String>) params.get("codeList"));
+		paramCodeList = params.get("codeList") == null ? new ArrayList<>():params.getList("codeList");
 		
 		tuples = commonCodeDslRepository.findAllCommonCodeNDetail( paramCodeList
 																  , params.getString("codeDelYn")
 																  , params.getString("codeDetailDelYn"));
-		recodeCount = tuples.size();
+		//recodeCount = tuples.size();
 		
 		log.debug("tuples {}", tuples);
 		
@@ -52,7 +52,7 @@ public class CommonCodeServiceImpl implements CommonCodeService {
 			CommonCodeDetailEntity commonCodeDetailEntity = tuple.get(QCommonCodeDetailEntity.commonCodeDetailEntity);
 
 			if(result.containsKey(commonCode.getCode())) {
-				codeInfo = (DataMap<String, Object>) result.get(commonCode.getCode());
+				codeInfo = result.getMap(commonCode.getCode());
 			}
 			
 			//동일한 키가 없으면 새로 map 생성, 있으면 list 가져옴.
@@ -68,7 +68,7 @@ public class CommonCodeServiceImpl implements CommonCodeService {
 				//list.add(codeInfo);
 				result.put(commonCode.getCode(), codeInfo);
 			} else {
-				codeList = (List<DataMap<String, Object>>) codeInfo.get("codeList");
+				codeList = codeInfo.getList("codeList");
 			}
 			
 			//item 추가

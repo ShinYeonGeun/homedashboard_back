@@ -14,16 +14,19 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.lotus.homeDashboard.cmn.usr.constants.UserConstants;
 import com.lotus.homeDashboard.cmn.usr.dao.LoginHistoryRepository;
+import com.lotus.homeDashboard.cmn.usr.dao.PasswordErrorHistoryRepository;
 import com.lotus.homeDashboard.cmn.usr.dao.UserGroupRepository;
 import com.lotus.homeDashboard.cmn.usr.dao.UserLogRepository;
 import com.lotus.homeDashboard.cmn.usr.dao.UserRepository;
 import com.lotus.homeDashboard.cmn.usr.dao.UserTokenRepository;
 import com.lotus.homeDashboard.cmn.usr.dao.spec.UserSpecification;
 import com.lotus.homeDashboard.cmn.usr.entity.LoginHistoryEntity;
+import com.lotus.homeDashboard.cmn.usr.entity.PasswordErrorHistoryEntity;
 import com.lotus.homeDashboard.cmn.usr.entity.QGroupEntity;
 import com.lotus.homeDashboard.cmn.usr.entity.QUserGroupEntity;
 import com.lotus.homeDashboard.cmn.usr.entity.UserEntity;
@@ -37,6 +40,7 @@ import com.lotus.homeDashboard.common.component.Request;
 import com.lotus.homeDashboard.common.component.ResultSet;
 import com.lotus.homeDashboard.common.component.ServiceInvoker;
 import com.lotus.homeDashboard.common.constants.Constants;
+import com.lotus.homeDashboard.common.constants.ResultCode;
 import com.lotus.homeDashboard.common.dao.spec.CommonSpecification;
 import com.lotus.homeDashboard.common.exception.BizException;
 import com.lotus.homeDashboard.common.jwt.JWTProvider;
@@ -48,6 +52,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Service("UserService")
 @Slf4j
+@Transactional
 public class UserServiceImpl implements UserService {
 	
 	@Autowired
@@ -70,6 +75,9 @@ public class UserServiceImpl implements UserService {
 	
 	@Autowired
 	private UserLogRepository userLogRepository;
+	
+	@Autowired
+	private PasswordErrorHistoryRepository passwordErrorHistoryRepository;
 		
 	@Override
 	public DataMap<String, Object> doLogin(Request request) {
@@ -85,16 +93,24 @@ public class UserServiceImpl implements UserService {
 		LoginHistoryEntity historyEntity = null;
 		ResultSet menuInqResult = null;
 		ResultSet commCodeInqResult = null;
+		ResultSet handleInvalidPswdResult = null;
 		UserTokenEntity tokenEntity = null;
 		Instant loginDtm = null;
 		CommonHeader header = null;
 		String encPw = "";
+		String decPw = "";
 		String accessToken = "";
 		DecodedJWT decodeToken = null;
 		
 		try {
 			
 			log.debug("__DBGLOG__ doLogin 시작");
+			
+			//===================================================================================
+			// 비로그인상태라 헤더에 거래UID 세팅
+			//===================================================================================
+			header = request.getHeader();
+			header.setTrnUserId(params.getString("loginId"));
 			
 			//===================================================================================
 			// 입력값 체크
@@ -135,25 +151,60 @@ public class UserServiceImpl implements UserService {
 				throw new BizException("login_deleted_id");
 			}
 			
+			//잠금여부 체크
+			if(UserConstants.USER_STATE.LOCKED.getCode().equals(userInfo.getUserState())) {
+				throw new BizException("login_lock_id");
+			}
+			
+			//비밀번호 복호화
+			decPw = EncryptUtil.decryptAES256(params.getString("pswd"));
+			
 			//입력한 비밀번호 암호화
-			encPw = EncryptUtil.encryptSHA256(params.getString("pswd"), params.getString("loginId"));
+			encPw = EncryptUtil.encryptSHA256(decPw, params.getString("loginId"));
 			log.debug("__DBGLOG__ 암호화 결과: [{}]", encPw);
 			log.debug("__DBGLOG__ DB 값: [{}]", userInfo.getPswd());
 			
 			//비밀번호 체크
 			if(!userInfo.getPswd().equals(encPw)) {
 				log.error("__ERRLOG__ 저장된 비밀번호와 전달된 비밀번호가 일치하지 않음");
-				throw new BizException("login_pwd_not_match"); 
+				
+				//===================================================================================
+				// 비밀번호 오류등록
+				//===================================================================================
+				Request invalidPswdParams = new Request();
+				DataMap<String, Object> invalidPswdParamMap = new DataMap<>();
+				invalidPswdParamMap.put("uid", params.getString("loginId"));
+				invalidPswdParamMap.put("errPswd", decPw);
+				invalidPswdParams.setHeader(header);
+				invalidPswdParams.setParameter(invalidPswdParamMap);
+				
+				handleInvalidPswdResult = serviceInvoker.invokeRequiresNew("UserService", "handleInvalidPassword", invalidPswdParams);
+				
+				if(ResultCode.SUCCESS.getCode().equals(handleInvalidPswdResult.getResultCd())) {
+					DataMap<String, Object> data = handleInvalidPswdResult.payloadAsDataMap();
+					
+					if(UserConstants.USER_STATE.LOCKED.getCode().equals(data.getString("userState", ""))) {
+						throw new BizException("login_pswd_not_match_lock", new String[] {String.valueOf(UserConstants.MAX_PSWD_ERR_CNT)}); 
+					}
+				}
+				
+				throw new BizException("login_pswd_not_match"); 
 			}
 			
-			//잠금여부 체크
-			if(UserConstants.USER_STATE.LOCKED.getCode().equals(userInfo.getUserState())) {
-				throw new BizException("login_lock_id");
-			}
-			
+			//===================================================================================
+			// 이용자 정보 갱신
+			//===================================================================================
+			userInfo.setPswdErrCnt(0);
 			userInfo.setLastLoginDtm(loginDtm);
 			userInfo.setLastTrnUUID(header.getUuid());
 			userInfo.setLastTrnUid(params.getString("loginId"));
+			
+			try {
+				userRepository.saveAndFlush(userInfo);
+			} catch (DataAccessException e) {
+				log.error("__ERRLOG__ login DataAccessException 발생 : {}", e);
+				throw new BizException("chg_error_prefix", new String[] {"로그인 정보"}, e);
+			}
 			
 			//===================================================================================
 			// 권한 조회 후 세팅
@@ -172,20 +223,19 @@ public class UserServiceImpl implements UserService {
 			historyEntity.setIp(request.getHeader().getRequestIp());
 			historyEntity.setLastTrnUUID(request.getHeader().getUuid());
 			historyEntity.setLastTrnUid(userInfo.getUid());
+			historyEntity.setLastTrnCd(header.getTrnCd());
 			
 			try {
-				
 				loginHistoryRepository.saveAndFlush(historyEntity);
-				
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ login DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_with_msg", new String[] {"로그인 이력"},e);
+				throw new BizException("reg_error_prefix", new String[] {"로그인 이력"},e);
 			}
 			
 			//===================================================================================
 			// JWT 토큰 발급
 			//===================================================================================
-			accessToken = jWTProvider.create(userInfo.getUid(), roles, request.getHeader().getUuid().toString(), loginDtm);
+			accessToken = jWTProvider.create(userInfo.getUid(), userInfo.getName(), roles, request.getHeader().getUuid().toString(), loginDtm);
 			log.debug("__DBGLOG__ JWT ACCESS TOKEN [{}]", accessToken);
 			
 			decodeToken = jWTProvider.decode(accessToken);
@@ -198,7 +248,13 @@ public class UserServiceImpl implements UserService {
 			tokenEntity.setSecurityKey(request.getHeader().getUuid().toString());
 			tokenEntity.setAccessToken(accessToken);
 			tokenEntity.setRefreshToken(Constants.BLANK);
-			userTokenRepository.saveAndFlush(tokenEntity);
+			
+			try {
+				userTokenRepository.saveAndFlush(tokenEntity);
+			} catch (DataAccessException e) {
+				log.error("__ERRLOG__ login DataAccessException 발생 : {}", e);
+				throw new BizException("reg_error_prefix", new String[] {"로그인 토큰"},e);
+			}
 			
 			//===================================================================================
 			// 사용자 메뉴 조회
@@ -305,6 +361,7 @@ public class UserServiceImpl implements UserService {
 				for(UserEntity userEntity : inqList.getContent()) {
 					DataMap<String, Object> data = new DataMap<>();
 					data.put("uid", userEntity.getUid());
+					data.put("name", userEntity.getName());
 					data.put("pswdErrCnt", userEntity.getPswdErrCnt());
 					data.put("userState", userEntity.getUserState());
 					data.put("lastLoginDtm", userEntity.getLastLoginDtm());
@@ -312,6 +369,7 @@ public class UserServiceImpl implements UserService {
 					data.put("lastTrnUUID", userEntity.getLastTrnUUID());
 					data.put("lastTrnDtm", userEntity.getLastTrnDtm());
 					data.put("lastTrnUid", userEntity.getLastTrnUid());
+					data.put("lastTrnCd", userEntity.getLastTrnCd());
 					userList.add(data);
 				}
 			}
@@ -449,6 +507,7 @@ public class UserServiceImpl implements UserService {
 				UserEntity userEntity = inqResult.get();
 				userInfo = new DataMap<String, Object>();
 				userInfo.put("uid", userEntity.getUid());
+				userInfo.put("name", userEntity.getName());
 				userInfo.put("pswdErrCnt", userEntity.getPswdErrCnt());
 				userInfo.put("userState", userEntity.getUserState());
 				userInfo.put("lastLoginDtm", userEntity.getLastLoginDtm());
@@ -456,6 +515,7 @@ public class UserServiceImpl implements UserService {
 				userInfo.put("lastTrnUUID", userEntity.getLastTrnUUID());
 				userInfo.put("lastTrnDtm", userEntity.getLastTrnDtm());
 				userInfo.put("lastTrnUid", userEntity.getLastTrnUid());
+				userInfo.put("lastTrnCd", userEntity.getLastTrnCd());
 			}
 			
 		} catch (BizException be) {
@@ -491,10 +551,9 @@ public class UserServiceImpl implements UserService {
 				log.debug("__DBGLOG__ add userState : [{}]", params.getString("userState"));
 				conditions = conditions.and(UserSpecification.eqUserState(params.getString("userState")));
 			}
-			if(!StringUtil.isEmpty(params.getString("delYn"))) {
-				log.debug("__DBGLOG__ add delYn : [{}]", params.getString("delYn"));
-				conditions = conditions.and(CommonSpecification.hasDelYn(params.getString("delYn")));
-			}
+			
+			//삭제여부 Y 포함 데이터 조회는 별도로 만들어서 사용.
+			conditions = conditions.and(CommonSpecification.hasDelYn(Constants.NO)); 
 			
 			inqResult = userRepository.count(conditions);
 			
@@ -522,6 +581,7 @@ public class UserServiceImpl implements UserService {
 		try {
 			
 			params = request.getParameter();
+			result = new DataMap<String, Object>();
 			
 			if(StringUtil.isEmpty(params.getString("uid"))) {
 				log.error("__ERRLOG__ 이용자ID 미입력");
@@ -529,7 +589,6 @@ public class UserServiceImpl implements UserService {
 			}
 			
 			rs = serviceInvoker.invoke("UserService", "inqCntUser", request);
-			result = new DataMap<String, Object>();
 			
 			if(rs != null) {
 				result = rs.payloadAsDataMap();
@@ -547,7 +606,7 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
-	public DataMap<String, Object> regUserInfo(Request request) {
+	public DataMap<String, Object> createUser(Request request) {
 		
 		DataMap<String, Object> params = null;
 		DataMap<String, Object> result = null;
@@ -557,15 +616,16 @@ public class UserServiceImpl implements UserService {
 		UserGroupEntity userGroupEntity = null;
 		CommonHeader header = null;
 		int maxSeq = 0;
-		
 		String uid = "";
+		String oldUserState = "";
+		String newUserState = "";
 		
 		try {
 			
 			header = request.getHeader();
 			params = request.getParameter();
-			
 			uid = params.getString("uid");
+			newUserState = params.getString("userState", "");
 			
 			log.debug("__DBGLOG__ 입력값 체크 시작");
 			//Thread.sleep(6000);
@@ -578,12 +638,12 @@ public class UserServiceImpl implements UserService {
 			}
 			
 			if(StringUtil.isEmpty(params.getString("userState"))) {
-				log.error("__ERRLOG__ 이용자ID 미입력");
+				log.error("__ERRLOG__ 이용자상태 미입력");
 				throw new BizException("val_required", new String[] {"이용자상태"}); 
 			}
 			
 			if(StringUtil.isEmpty(params.getString("delYn"))) {
-				log.error("__ERRLOG__ 이용자ID 미입력");
+				log.error("__ERRLOG__ 삭제여부 미입력");
 				throw new BizException("val_required", new String[] {"삭제여부"}); 
 			}
 			
@@ -595,9 +655,22 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			userInfo = userRepository.findById(uid);
 			
-			if(!userInfo.isEmpty()) {
-				log.error("__ERRLOG__ 기등록된 이용자 존재 [{}]", params.getString("uid"));
-				throw new BizException("reg_data_exists_msg", new String[] {StringUtil.concat("이용자ID: ", params.getString("uid"))});
+			if(userInfo.isPresent()) {
+				userEntity = userInfo.get();
+				
+				log.debug("__DBGLOG__ 이용자ID:[{}]", userEntity.getUid());
+				log.debug("__DBGLOG__ 삭제여부:[{}]", userEntity.getDelYn());
+				
+				//삭제된 데이터면 업데이트
+				if(!Constants.YES.equals(userInfo.get().getDelYn())) {
+					log.error("__ERRLOG__ 기등록된 이용자 존재 [{}]", params.getString("uid"));
+					throw new BizException("reg_data_exists_msg", new String[] {StringUtil.concat("이용자ID: ", params.getString("uid"))});
+				}
+				
+				oldUserState = userEntity.getUserState();
+				
+			} else {
+				userEntity = new UserEntity();
 			}
 			
 			log.debug("__DBGLOG__ 이용자 조회 종료");
@@ -606,13 +679,27 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			// 이용자 등록
 			//===================================================================================
-			userEntity = new UserEntity();
 			userEntity.setUid(uid);
+			userEntity.setName(params.getString("name", ""));
 			userEntity.setPswd(EncryptUtil.encryptSHA256(uid, uid));
 			userEntity.setUserState(UserConstants.USER_STATE.USE.getCode());
+			userEntity.setDelYn(Constants.NO);
 			userEntity.setLastTrnUUID(header.getUuid());
 			userEntity.setLastTrnUid(header.getTrnUserId());
-			userRepository.saveAndFlush(userEntity);
+			userEntity.setLastTrnCd(header.getTrnCd());
+			
+			//기존에 잠금상태에서 사용으로 변경 시 비밀번호 오류횟수 초기화
+			if(UserConstants.USER_STATE.LOCKED.getCode().equals(oldUserState) &&
+			   UserConstants.USER_STATE.USE.getCode().equals(newUserState)) {
+				userEntity.setPswdErrCnt(0);
+			}
+
+			try {
+				userRepository.save(userEntity);
+			} catch (DataAccessException e) {
+				log.error("__ERRLOG__ createUser DataAccessException 발생 : {}", e);
+				throw new BizException("reg_error_prefix", new String[] {"이용자 정보"},e);
+			}
 			
 			log.debug("__DBGLOG__ 이용자 등록 종료");
 			log.debug("__DBGLOG__ 이용자권한 등록(일반사용자) 시작");
@@ -625,14 +712,13 @@ public class UserServiceImpl implements UserService {
 			userGroupEntity.setGrpCd(UserConstants.USER_GROUP_CODE.GENERAL.getCode());
 			userGroupEntity.setLastTrnUUID(header.getUuid());
 			userGroupEntity.setLastTrnUid(header.getTrnUserId());
+			userGroupEntity.setLastTrnCd(header.getTrnCd());
 			
 			try {
-				
-				userGroupRepository.saveAndFlush(userGroupEntity);
-				
+				userGroupRepository.save(userGroupEntity);
 			} catch (DataAccessException e) {
-				log.error("__ERRLOG__ regUserInfo DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_with_msg", new String[] {"이용자 권한"}, e);
+				log.error("__ERRLOG__ createUser DataAccessException 발생 : {}", e);
+				throw new BizException("reg_error_prefix", new String[] {"이용자 권한"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자권한 등록(일반사용자) 종료");
@@ -641,7 +727,7 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			// 이용자 변경로그 최대 일련번호 조회
 			//===================================================================================
-			maxSeq = userLogRepository.findMaxByTranDtAndUid(header.getCurrDate(), uid);
+			maxSeq = userLogRepository.findMaxByTrnDtAndUid(header.getCurrDate(), uid);
 			
 			log.debug("__DBGLOG__ 이용자변경로그 최대일련번호 조회 종료");
 			
@@ -656,20 +742,19 @@ public class UserServiceImpl implements UserService {
 			// 이용자 변경로그 등록
 			//===================================================================================
 			userLogEntity = new UserLogEntity();
-			userLogEntity.setTranDt(header.getCurrDate());
+			userLogEntity.setTrnDt(header.getCurrDate());
 			userLogEntity.setUid(uid);
 			userLogEntity.setSeq(maxSeq);
 			userLogEntity.setUserChgTypeCd(UserConstants.USER_CHG_TYPE_CD.REG_BY_ADMIN.getCode());
 			userLogEntity.setLastTrnUUID(header.getUuid());
 			userLogEntity.setLastTrnUid(header.getTrnUserId());
+			userLogEntity.setLastTrnCd(header.getTrnCd());
 			
 			try {
-				
-				userLogRepository.saveAndFlush(userLogEntity);
-				
+				userLogRepository.save(userLogEntity);
 			} catch (DataAccessException e) {
-				log.error("__ERRLOG__ regUserInfo DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_with_msg", new String[] {"이용자 변경로그"}, e);
+				log.error("__ERRLOG__ createUser DataAccessException 발생 : {}", e);
+				throw new BizException("reg_error_prefix", new String[] {"이용자 변경로그"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자변경로그 등록 종료");
@@ -678,21 +763,18 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			// 이용자 정보 조회
 			//===================================================================================
-			userInfo = null;
 			userInfo = userRepository.findById(uid);
+			
+			if(userInfo.isEmpty()) {
+				log.error("__ERRLOG__ createUser 등록 후 조회 NOT FOUND");
+				throw new BizException("not_found_msg", new String[] {StringUtil.concat("이용자ID:", uid)});
+			}
 			
 			userEntity = null;
 			userEntity = userInfo.get();
 			
 			result = new DataMap<String, Object>();
-			result.put("uid", userEntity.getUid());
-			result.put("pswdErrCnt", userEntity.getPswdErrCnt());
-			result.put("userState", userEntity.getUserState());
-			result.put("lastLoginDtm", userEntity.getLastLoginDtm());
-			result.put("delYn", userEntity.getDelYn());
-			result.put("lastTrnUUID", userEntity.getLastTrnUUID());
-			result.put("lastTrnDtm", userEntity.getLastTrnDtm());
-			result.put("lastTrnUid", userEntity.getLastTrnUid());
+			result.put("userInfo", userEntity);
 			
 			log.debug("__DBGLOG__ 이용자정보 조회 종료");
 			
@@ -702,12 +784,421 @@ public class UserServiceImpl implements UserService {
 			log.debug("__DBGLOG__ [{}]", result);
 			
 		} catch (BizException be) {
-			log.error("__ERRLOG__ regUserInfo BizException", be);
-			log.error("__ERRLOG__ regUserInfo BizException {}", be.getMessage());
+			log.error("__ERRLOG__ createUser BizException", be);
+			log.error("__ERRLOG__ createUser BizException {}", be.getMessage());
 			throw be;
 		} catch (Exception e) {
-			log.error("__ERRLOG__ regUserInfo Exception 발생 : {}", e);
+			log.error("__ERRLOG__ createUser Exception 발생 : {}", e);
 			throw new BizException("process_err", e);
+		}
+		
+		return result;
+	}
+
+	@Override
+	public DataMap<String, Object> handleInvalidPassword(Request request) {
+		
+		DataMap<String, Object> params = null;
+		DataMap<String, Object> result = null;
+		CommonHeader header = null;
+		Optional<UserEntity> optionalUserInfo = null;
+		UserEntity userInfo = null;
+		PasswordErrorHistoryEntity pswdErrHistEntity = null;
+		String uid = "";
+		String userState = "";
+		int errCnt = 0;
+		int maxSeq = 0;
+		
+		try {
+			
+			result = new DataMap<>();
+			header = request.getHeader();
+			params = request.getParameter();
+			
+			uid = params.getString("uid");
+			
+			log.debug("__DBGLOG__ 필수값 체크 시작");
+			
+			//===================================================================================
+			// 필수값 체크
+			//===================================================================================
+			if(StringUtil.isEmpty(uid)) {
+				log.error("__ERRLOG__ 이용자ID 미입력");
+				throw new BizException("val_required", new String[] {"이용자ID"}); 
+			}
+			
+			log.debug("__DBGLOG__ 필수값 체크 종료");
+			log.debug("__DBGLOG__ 이용자 조회 시작");
+			
+			//===================================================================================
+			// 이용자정보 조회
+			//===================================================================================
+			optionalUserInfo = userRepository.findById(uid);
+			
+			// 이용자 정보 없으면 오류
+			if(optionalUserInfo.isEmpty()) {
+				log.error("__ERRLOG__ 이용자 미존재 [{}]", uid);
+				throw new BizException("not_found_msg", new String[] {StringUtil.concat("이용자ID: ", uid)});
+			} else {
+				userInfo = optionalUserInfo.get();
+			}
+			
+			log.debug("__DBGLOG__ 이용자 조회 종료");
+			log.debug("__DBGLOG__ 잠금여부 체크 시작");
+			
+			//===================================================================================
+			// 잠금여부 체크
+			//===================================================================================
+			errCnt = userInfo.getPswdErrCnt() == null ? 0 : userInfo.getPswdErrCnt();
+			
+			log.debug("__DBGLOG__ 비밀번호 오류횟수:[{}]", errCnt);
+			
+			if(++errCnt < UserConstants.MAX_PSWD_ERR_CNT) {
+				userState = userInfo.getUserState();
+			} else {
+				userState = UserConstants.USER_STATE.LOCKED.getCode();
+			}
+			
+			log.debug("__DBGLOG__ 잠금여부 체크 종료");
+			log.debug("__DBGLOG__ 비밀번호 오류내역 등록 시작");
+			
+			//===================================================================================
+			// 비밀번호 오류내역 최대일련번호 조회
+			//===================================================================================
+			maxSeq = passwordErrorHistoryRepository.findMaxByTrnDtAndUid(header.getCurrDate(), uid);
+			
+			log.debug("__DBGLOG__ 현재 최대일련번호 [{}]", maxSeq);
+			
+			//===================================================================================
+			// 비밀번호 오류내역 등록
+			//===================================================================================
+			pswdErrHistEntity = new PasswordErrorHistoryEntity();
+			pswdErrHistEntity.setTrnDt(header.getCurrDate());
+			pswdErrHistEntity.setUid(uid);
+			pswdErrHistEntity.setSeq(++maxSeq);
+			pswdErrHistEntity.setErrPswd(params.getString("errPswd"));
+			pswdErrHistEntity.setDelYn(Constants.NO);
+			pswdErrHistEntity.setLastTrnUid(header.getTrnUserId());
+			pswdErrHistEntity.setLastTrnUUID(header.getUuid());
+			pswdErrHistEntity.setLastTrnCd(header.getTrnCd());
+			
+			log.debug("__DBGLOG__ 오류내역 Entity: [{}]", pswdErrHistEntity);
+			
+			try {
+				passwordErrorHistoryRepository.saveAndFlush(pswdErrHistEntity);
+			} catch (DataAccessException e) {
+				log.error("__ERRLOG__ handleInvalidPassword DataAccessException 발생 : {}", e);
+				throw new BizException("reg_error_prefix", new String[] {"비밀번호 오류내역"}, e);
+			}
+			
+			log.debug("__DBGLOG__ 비밀번호 오류내역 등록 종료");
+			log.debug("__DBGLOG__ 이용자 정보 갱신 시작");
+			
+			//===================================================================================
+			// 이용자정보 갱신
+			//===================================================================================
+			userInfo.setPswdErrCnt(errCnt);
+			userInfo.setUserState(userState);
+			userInfo.setLastTrnUid(header.getTrnUserId());
+			userInfo.setLastTrnUUID(header.getUuid());
+			userInfo.setLastTrnCd(header.getTrnCd());
+			
+			try {
+				userRepository.saveAndFlush(userInfo);
+			} catch (DataAccessException e) {
+				log.error("__ERRLOG__ handleInvalidPassword DataAccessException 발생 : {}", e);
+				throw new BizException("chg_error_prefix", new String[] {"이용자 정보"}, e);
+			}
+			
+			log.debug("__DBGLOG__ 이용자 정보 갱신 종료");
+			
+			//===================================================================================
+			// 결과조립
+			//===================================================================================
+			result.put("uid", userInfo.getUid());
+			result.put("pswdErrCnt", userInfo.getPswdErrCnt());
+			result.put("userState", userState);
+			
+		} catch (BizException be) {
+			throw be;
+		} catch (Exception e) {
+			throw new BizException("process_err", e);
+		}
+		return result;
+	}
+
+	@Override
+	public DataMap<String, Object> updateUser(Request request) {
+		
+		DataMap<String, Object> result = null;
+		DataMap<String, Object> params = null;
+		CommonHeader header = null;
+		
+		Optional<UserEntity> optionalUserEntity = null;
+		UserEntity userEntity = null;
+		UserLogEntity userLogEntity = null;
+		String uid = "";
+		String oldUserState = "";
+		String newUserState = "";
+		int maxSeq = 0;
+		
+		try {
+			
+			//===================================================================================
+			// 변수 초기값 세팅
+			//===================================================================================
+			result = new DataMap<>();
+			header = request.getHeader();
+			params = request.getParameter();
+			uid = params.getString("uid");
+			
+			log.debug("__DBGLOG__ 입력값 체크 시작");
+			
+			//===================================================================================
+			// 필수값 체크
+			//===================================================================================
+			if(StringUtil.isEmpty(uid)) {
+				log.error("__ERRLOG__ 이용자아이디 미입력");
+				throw new BizException("val_required", new String[] {"이용자아이디"}); 
+			}
+			
+			if(StringUtil.isEmpty(params.getString("delYn"))) {
+				log.error("__ERRLOG__ 삭제여부 미입력");
+				throw new BizException("val_required", new String[] {"삭제여부"}); 
+			}
+			
+			log.debug("__DBGLOG__ 입력값 체크 종료");
+			log.debug("__DBGLOG__ 이용자 조회 시작");
+
+			//===================================================================================
+			// 이용자정보 조회
+			//===================================================================================
+			optionalUserEntity = userRepository.findById(uid);
+			
+			// 이용자 정보 없으면 오류
+			if(optionalUserEntity.isEmpty()) {
+				log.error("__ERRLOG__ 이용자 미존재 [{}]", uid);
+				throw new BizException("not_found_msg", new String[] {StringUtil.concat("이용자ID: ", uid)});
+			} else {
+				userEntity = optionalUserEntity.get();
+				oldUserState = userEntity.getUserState();
+				newUserState = params.getString("userState", "");
+			}
+			
+			log.debug("__DBGLOG__ 이용자 조회 종료");
+			log.debug("__DBGLOG__ 이용자 수정 시작");
+			
+			//===================================================================================
+			// 이용자정보 수정
+			//===================================================================================
+			userEntity.setName(params.getString("name", ""));
+			userEntity.setUserState(newUserState);
+			userEntity.setDelYn(Constants.NO);
+			userEntity.setLastTrnUUID(header.getUuid());
+			userEntity.setLastTrnUid(header.getTrnUserId());
+			userEntity.setLastTrnCd(header.getTrnCd());
+			
+			//기존에 잠금상태에서 사용으로 변경 시 비밀번호 오류횟수 초기화
+			if(UserConstants.USER_STATE.LOCKED.getCode().equals(oldUserState) &&
+			   UserConstants.USER_STATE.USE.getCode().equals(newUserState)) {
+				userEntity.setPswdErrCnt(0);
+			}
+			
+			try {
+				
+				userEntity = userRepository.saveAndFlush(userEntity);
+				
+				if(userEntity == null) {
+					log.error("__ERRLOG__ updateUser saveAndFlush null");
+					throw new BizException("chg_error_prefix", new String[] {"이용자정보"});
+				}
+				
+			} catch (DataAccessException e) {
+				log.error("__ERRLOG__ updateUser DataAccessException 발생 : {}", e);
+				throw new BizException("chg_error_prefix", new String[] {"이용자 정보"},e);
+			}
+			
+			log.debug("__DBGLOG__ 이용자 수정 종료");
+			log.debug("__DBGLOG__ 이용자변경로그 최대일련번호 조회 시작");
+			
+			//===================================================================================
+			// 이용자 변경로그 최대 일련번호 조회
+			//===================================================================================
+			maxSeq = userLogRepository.findMaxByTrnDtAndUid(header.getCurrDate(), uid);
+			
+			log.debug("__DBGLOG__ 이용자변경로그 최대일련번호 조회 종료");
+			
+			//===================================================================================
+			// 이용자 변경로그 최대 일련번호 증가
+			//===================================================================================
+			maxSeq++;
+			
+			log.debug("__DBGLOG__ 이용자변경로그 등록 시작");
+			
+			//===================================================================================
+			// 이용자 변경로그 등록
+			//===================================================================================
+			userLogEntity = new UserLogEntity();
+			userLogEntity.setTrnDt(header.getCurrDate());
+			userLogEntity.setUid(uid);
+			userLogEntity.setSeq(maxSeq);
+			userLogEntity.setUserChgTypeCd(UserConstants.USER_CHG_TYPE_CD.CHG_BY_ADMIN.getCode());
+			userLogEntity.setLastTrnUUID(header.getUuid());
+			userLogEntity.setLastTrnUid(header.getTrnUserId());
+			userLogEntity.setLastTrnCd(header.getTrnCd());
+			
+			try {
+				userLogRepository.saveAndFlush(userLogEntity);
+			} catch (DataAccessException e) {
+				log.error("__ERRLOG__ updateUser DataAccessException 발생 : {}", e);
+				throw new BizException("reg_error_prefix", new String[] {"이용자 변경로그"}, e);
+			}
+			
+			log.debug("__DBGLOG__ 이용자변경로그 등록 종료");
+			
+			//===================================================================================
+			// 출력값 조립
+			//===================================================================================
+			result.put("userInfo", userEntity);
+		
+		} catch (BizException be) {
+			throw be;	
+		} catch (Exception e) {
+			log.error("__ERRLOG__ updateUser Exception 발생 : {}", e);
+			new BizException("inquiry_err", e);
+		}
+		
+		return result;
+	}
+
+	@Override
+	public DataMap<String, Object> deleteUser(Request request) {
+		
+		DataMap<String, Object> result = null;
+		DataMap<String, Object> params = null;
+		CommonHeader header = null;
+		
+		Optional<UserEntity> optionalUserEntity = null;
+		UserEntity userEntity = null;
+		UserLogEntity userLogEntity = null;
+		String uid = "";
+		int maxSeq = 0;
+		
+		try {
+			
+			//===================================================================================
+			// 변수 초기값 세팅
+			//===================================================================================
+			result = new DataMap<>();
+			header = request.getHeader();
+			params = request.getParameter();
+			uid = params.getString("uid");
+			
+			log.debug("__DBGLOG__ 입력값 체크 시작");
+			
+			//===================================================================================
+			// 필수값 체크
+			//===================================================================================
+			if(StringUtil.isEmpty(uid)) {
+				log.error("__ERRLOG__ 이용자아이디 미입력");
+				throw new BizException("val_required", new String[] {"이용자아이디"}); 
+			}
+
+			log.debug("__DBGLOG__ 입력값 체크 종료");
+			log.debug("__DBGLOG__ 이용자 조회 시작");
+
+			//===================================================================================
+			// 이용자정보 조회
+			//===================================================================================
+			optionalUserEntity = userRepository.findById(uid);
+			
+			// 이용자 정보 없으면 오류
+			if(optionalUserEntity.isEmpty()) {
+				log.error("__ERRLOG__ 이용자 미존재 [{}]", uid);
+				throw new BizException("not_found_msg", new String[] {StringUtil.concat("이용자ID: ", uid)});
+			} else {
+				
+				userEntity = optionalUserEntity.get();
+				
+				if(Constants.YES.equals(userEntity.getDelYn())) {
+					log.error("__ERRLOG__ 이미 삭제된 이용자 [{}]", uid);
+					throw new BizException("del_already_msg", new String[] {StringUtil.concat("이용자아이디: ", uid)});
+				}
+			}
+			
+			log.debug("__DBGLOG__ 이용자 조회 종료");
+			log.debug("__DBGLOG__ 이용자 삭제 시작");
+			
+			//===================================================================================
+			// 이용자정보 수정
+			//===================================================================================
+			userEntity.setDelYn(Constants.YES);
+			userEntity.setLastTrnUUID(header.getUuid());
+			userEntity.setLastTrnUid(header.getTrnUserId());
+			userEntity.setLastTrnCd(header.getTrnCd());
+			
+			try {
+				
+				userEntity = userRepository.saveAndFlush(userEntity);
+				
+				if(userEntity == null) {
+					log.error("__ERRLOG__ deleteUser saveAndFlush null");
+					throw new BizException("chg_error_prefix", new String[] {"이용자정보"});
+				}
+				
+			} catch (DataAccessException e) {
+				log.error("__ERRLOG__ deleteUser DataAccessException 발생 : {}", e);
+				throw new BizException("del_error_prefix", new String[] {"이용자 정보"},e);
+			}
+			
+			log.debug("__DBGLOG__ 이용자 삭제 종료");
+			log.debug("__DBGLOG__ 이용자변경로그 최대일련번호 조회 시작");
+			
+			//===================================================================================
+			// 이용자 변경로그 최대 일련번호 조회
+			//===================================================================================
+			maxSeq = userLogRepository.findMaxByTrnDtAndUid(header.getCurrDate(), uid);
+			
+			log.debug("__DBGLOG__ 이용자변경로그 최대일련번호 조회 종료");
+			
+			//===================================================================================
+			// 이용자 변경로그 최대 일련번호 증가
+			//===================================================================================
+			maxSeq++;
+			
+			log.debug("__DBGLOG__ 이용자변경로그 등록 시작");
+			
+			//===================================================================================
+			// 이용자 변경로그 등록
+			//===================================================================================
+			userLogEntity = new UserLogEntity();
+			userLogEntity.setTrnDt(header.getCurrDate());
+			userLogEntity.setUid(uid);
+			userLogEntity.setSeq(maxSeq);
+			userLogEntity.setUserChgTypeCd(UserConstants.USER_CHG_TYPE_CD.DEL_BY_ADMIN.getCode());
+			userLogEntity.setLastTrnUUID(header.getUuid());
+			userLogEntity.setLastTrnUid(header.getTrnUserId());
+			userLogEntity.setLastTrnCd(header.getTrnCd());
+			
+			try {
+				userLogRepository.saveAndFlush(userLogEntity);
+			} catch (DataAccessException e) {
+				log.error("__ERRLOG__ deleteUser DataAccessException 발생 : {}", e);
+				throw new BizException("reg_error_prefix", new String[] {"이용자 변경로그"}, e);
+			}
+			
+			log.debug("__DBGLOG__ 이용자변경로그 등록 종료");
+			
+			//===================================================================================
+			// 출력값 조립
+			//===================================================================================
+			result.put("userInfo", userEntity);
+			
+		} catch (BizException be) {
+			throw be;	
+		} catch (Exception e) {
+			log.error("__ERRLOG__ deleteUser Exception 발생 : {}", e);
+			new BizException("inquiry_err", e);
 		}
 		
 		return result;

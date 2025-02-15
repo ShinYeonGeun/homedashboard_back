@@ -9,19 +9,20 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 
 @Repository
 public class UserLogDslRepositoryImpl implements UserLogDslRepository {
+	
 	@Autowired
 	private JPAQueryFactory jpaQueryFactory;
 	
 	@Override
-	public Integer findMaxByTranDtAndUid(String tranDt, String uid) {
+	public Integer findMaxByTrnDtAndUid(String trnDt, String uid) {
 		
 		QUserLogEntity userLogEntity = QUserLogEntity.userLogEntity;
 		
 		Integer result = jpaQueryFactory.select(userLogEntity.seq.max())
 										.from(userLogEntity)
-										.where(userLogEntity.tranDt.eq(tranDt)
+										.where(userLogEntity.trnDt.eq(trnDt)
 												, userLogEntity.uid.eq(uid) )
-										.groupBy(userLogEntity.tranDt, userLogEntity.uid).fetchOne();
+										.groupBy(userLogEntity.trnDt, userLogEntity.uid).fetchOne();
 		
 		return result == null ? 0 : result.intValue();
 	}

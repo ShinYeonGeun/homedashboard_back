@@ -13,14 +13,14 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name="TUSR04", schema = "hdsbd")
+@Table(name="TUSR05", schema = "hdsbd")
 @Data
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
-@IdClass(UserLogKeyEntity.class)
-public class UserLogEntity extends CommonEntity {	
-	
+@IdClass(PasswordErrorHistoryKeyEntity.class)
+public class PasswordErrorHistoryEntity extends CommonEntity {
+
 	@Id
 	@Column(name = "TRN_DT")
 	private String trnDt;
@@ -31,7 +31,6 @@ public class UserLogEntity extends CommonEntity {
 	@Id
 	private Integer seq;
 	
-	@Column(name = "USER_CHG_TYPE_CD")
-	private String userChgTypeCd;
-
+	@Column(name = "ERR_PSWD")
+	private String errPswd;
 }
