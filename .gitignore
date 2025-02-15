@@ -33,5 +33,6 @@ build/
 .vscode/
 
 
-HDSBD/*.log
-HDSBD/*.gz
+HDSBD*.log
+HDSBD*.gz
+HDSBD.*.gz

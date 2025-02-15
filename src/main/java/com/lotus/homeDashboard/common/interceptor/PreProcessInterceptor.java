@@ -1,7 +1,5 @@
 package com.lotus.homeDashboard.common.interceptor;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -10,7 +8,6 @@ import java.util.UUID;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.util.ContentCachingRequestWrapper;
@@ -95,9 +92,13 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			//===================================================================================
 			// 토큰 유효성검사
 			//===================================================================================
-			if(!StringUtil.isOrEquals(req.getRequestURI(), Constants.LOGIN_URI, Constants.HEALTH_CHECK_URI)) {
+			//if(!StringUtil.isEqualToAny(req.getRequestURI(), Constants.LOGIN_URI, Constants.HEALTH_CHECK_URI)) {
+			if(StringUtil.isEqualToAny(req.getRequestURI(), Constants.LOGIN_URI, Constants.HEALTH_CHECK_URI)) {
 				
-				//if(!accessToken.startsWith(Constants.AUTH)) {
+				header.setTrnCd(Constants.LOGIN_URI.equals(req.getRequestURI()) ? "LOGIN":"HEALTH");
+				
+			} else {
+				
 				if(!Constants.AUTH.equals(header.getAuthorization())){
 					throw new LoginException("val_invalid_auth");
 				}
@@ -109,6 +110,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 				}
 				
 				response.setHeader(Keys.ACCESS_TOKEN.getKey(), header.getAccessToken());
+				
 			}
 			
 			
@@ -286,6 +288,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			//header.setTrnChnlCd(Constants.CHANNEL_CODE);
 			
 			//거래코드 조립
+			log.debug("__DBGLOG__ createHeader trnCd: [{}]", request.getHeader(Keys.TRAN_CD.getKey()));
 			header.setTrnCd(String.valueOf(request.getHeader(Keys.TRAN_CD.getKey())));
 			
 			//IP

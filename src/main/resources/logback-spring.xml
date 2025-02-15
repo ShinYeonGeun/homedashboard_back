@@ -68,6 +68,9 @@
             <appender-ref ref="CONSOLE" />
             <appender-ref ref="FILE" />
         </logger>
+        <logger name="org.springframework.jdbc.datasource.DataSourceTransactionManager" level="DEBUG"/>
+    <logger name="org.springframework.orm.jpa.JpaTransactionManager" level="DEBUG"/>
+    <logger name="org.hibernate.resource.transaction" level="DEBUG"/>
         <root level="${rootLogLevel}">
             <appender-ref ref="CONSOLE" />
         </root>
@@ -75,5 +78,4 @@
 <!--        <root level="INFO" additivity="false">-->
 <!--            <appender-ref ref="CONSOLE" />-->
 <!--        </root>-->
-
 </configuration>

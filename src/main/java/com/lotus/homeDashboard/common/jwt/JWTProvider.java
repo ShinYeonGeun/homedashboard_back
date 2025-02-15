@@ -30,11 +30,12 @@ public class JWTProvider {
 	@Autowired
 	private UserTokenRepository userTokenRepository;
 
-	public String create(String uid, List<String> roles, String key, Instant currDatetime) {
+	public String create(String uid, String name, List<String> roles, String key, Instant currDatetime) {
 		
 		JWTCreator.Builder builder = JWT.create();
 		
 		log.debug("__DBGLOG__ 토큰 uid:[{}]", uid);
+		log.debug("__DBGLOG__ 토큰 uid:[{}]", name);
 		log.debug("__DBGLOG__ 토큰 roles:[{}]", roles);
 		log.debug("__DBGLOG__ 토큰 key:[{}]", key);
 		log.debug("__DBGLOG__ 토큰 currDatetime:[{}]", currDatetime);
@@ -42,6 +43,7 @@ public class JWTProvider {
 		
 		builder.withIssuer("lotus");
 		builder.withSubject(uid);
+		builder.withClaim("name", name);
 		builder.withClaim("roles", roles);
 		builder.withClaim("loginDtm", currDatetime);
 		builder.withClaim("uuid", key);
@@ -56,18 +58,21 @@ public class JWTProvider {
 
 		tokenInfo = this.validate(prevToken);
 		log.debug("extension prevToken:{}", tokenInfo.getClaims());
-		Instant loginDtm = Instant.ofEpochSecond(Long.parseLong(String.valueOf(tokenInfo.getClaims().get("loginDtm"))));
+		Instant loginDtm = Instant.ofEpochSecond(tokenInfo.getClaims().get("loginDtm").asLong());
 		Instant expDtm = tokenInfo.getExpiresAtAsInstant();
 		Instant now = Instant.now();
+		String name = tokenInfo.getClaims().get("name").asString();
 		
 		builder.withIssuer(tokenInfo.getIssuer());
 		builder.withSubject(tokenInfo.getSubject());
+		builder.withClaim("name", name);
 		builder.withClaim("roles", roles);
 		builder.withClaim("loginDtm", loginDtm);
 		builder.withClaim("uuid", key);
 		builder.withExpiresAt(expDtm.plusSeconds(this.tokenExpSec - Duration.between(now, expDtm).getSeconds()));
 		
 		log.debug("__DBGLOG__ uuid {}", key);
+		log.debug("__DBGLOG__ name {}", name);
 		log.debug("__DBGLOG__ loginDtm {}", loginDtm);
 		log.debug("__DBGLOG__ now {}", now);
 		log.debug("__DBGLOG__ prev expDtm {}", expDtm);

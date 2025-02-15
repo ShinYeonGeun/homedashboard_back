@@ -35,7 +35,7 @@ public class StringUtil {
 	 * @param val
 	 * @return
 	 */
-	public static boolean isOrEquals(String arg, String...val) {
+	public static boolean isEqualToAny(String arg, String...val) {
 
 		if(StringUtil.isEmpty(arg)) {
 			return false;

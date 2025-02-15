@@ -22,6 +22,8 @@ public class DataSourceConfig {
 	
 	@Autowired
     private Environment env;
+	
+	private final String ENCRYPT_KEY = "DBPASSWORD";
 
     @Bean
     public DataSource dataSource() {
@@ -31,7 +33,7 @@ public class DataSourceConfig {
                 .driverClassName(env.getProperty("spring.datasource.driver-class-name"))
                 .url(env.getProperty("spring.datasource.url"))
                 .username(env.getProperty("spring.datasource.username"))
-                .password(EncryptUtil.decryptAES256(env.getProperty("spring.datasource.password"), "DBPASSWORD"))
+                .password(EncryptUtil.decryptAES256(env.getProperty("spring.datasource.password"), ENCRYPT_KEY))
                 .build();
     }
 
