@@ -8,7 +8,7 @@ spring:
         username: DSB_APP
         password: pp8Ow2s2MdEdRm6VSaQDyQ== 
     jpa:
-        show-sql: true
+        show-sql: false
         format_sql: true
         use_sql_comments: true
         hibernate:
@@ -23,6 +23,8 @@ logging:
     level:
         biz: DEBUG
         root: INFO
+        bind: TRACE
+        sql: DEBUG
     file:
         path: D:/00.dashboard/log
         name: HDSBD

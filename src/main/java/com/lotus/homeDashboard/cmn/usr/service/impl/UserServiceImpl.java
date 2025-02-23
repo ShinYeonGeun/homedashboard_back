@@ -88,7 +88,7 @@ public class UserServiceImpl implements UserService {
 		List<DataMap<String,Object>> menuList = null;
 		List<DataMap<String, Object>> userGrpList = null;
 		List<String> roles = null;
-		Optional<UserEntity> userEntity = null;
+		Optional<UserEntity> userEntity = Optional.empty();
 		UserEntity userInfo = null;
 		LoginHistoryEntity historyEntity = null;
 		ResultSet menuInqResult = null;
@@ -264,7 +264,7 @@ public class UserServiceImpl implements UserService {
 			userMenuParamMap.put("grpCd", userGrpList.stream().map(map -> map.getString("grpCd")).collect(Collectors.toList()));
 			userMenuParams.setHeader(header);
 			userMenuParams.setParameter(userMenuParamMap);
-			menuInqResult = serviceInvoker.invoke("MenuService", "inqUserMenuList", userMenuParams);
+			menuInqResult = serviceInvoker.callService("MenuService", "inqUserMenuList", userMenuParams);
 			
 			log.debug("__DBGLOG__ menuInqResult : {}", menuInqResult);
 			
@@ -283,7 +283,7 @@ public class UserServiceImpl implements UserService {
 			commonCodeParamMap.put("codeDetailDelYn", Constants.NO);
 			commonCodeParams.setHeader(header);
 			commonCodeParams.setParameter(commonCodeParamMap);
-			commCodeInqResult = serviceInvoker.invoke("CommonCodeService", "inqCommonCodeNAllDetail", commonCodeParams);
+			commCodeInqResult = serviceInvoker.callService("CommonCodeService", "inqCommonCodeNAllDetail", commonCodeParams);
 			
 			if(commCodeInqResult != null) {
 				commCodeMap = commCodeInqResult.payloadAsDataMap();
@@ -380,7 +380,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserList Exception 발생 : {}", e);
-			new BizException("inquiry_err");
+			throw new BizException("inquiry_err", e);
 		}
 		
 		return result;
@@ -390,7 +390,7 @@ public class UserServiceImpl implements UserService {
 	public DataMap<String, Object> extensionJWTPeriod(Request request ) {
 		
 		DataMap<String, Object> result = null;
-		Optional<UserTokenEntity> tokenEntity = null;
+		Optional<UserTokenEntity> tokenEntity = Optional.empty();
 		List<DataMap<String, Object>> userGrpList = null;
 		List<String> roles = null;
 		String accessToken = "";
@@ -466,7 +466,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserGrpList Exception 발생 : {}", e);
-			new BizException("inquiry_err");
+			throw new BizException("inquiry_err", e);
 		}
 		
 		return userGrpList;
@@ -477,7 +477,7 @@ public class UserServiceImpl implements UserService {
 		
 		DataMap<String, Object> params = null;
 		DataMap<String, Object> userInfo = null;
-		Optional<UserEntity> inqResult = null;
+		Optional<UserEntity> inqResult = Optional.empty();
 		Specification<UserEntity> conditions = Specification.where(CommonSpecification.alwaysTrue());
 		
 		try {
@@ -523,7 +523,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserInfo Exception 발생 : {}", e);
-			new BizException("inquiry_err");
+			throw new BizException("inquiry_err", e);
 		}
 		return userInfo;
 	}
@@ -565,7 +565,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserInfo Exception 발생 : {}", e);
-			new BizException("inquiry_err");
+			throw new BizException("inquiry_err", e);
 		}
 		
 		return result;
@@ -588,7 +588,7 @@ public class UserServiceImpl implements UserService {
 				throw new BizException("val_required", new String[] {"이용자ID"}); 
 			}
 			
-			rs = serviceInvoker.invoke("UserService", "inqCntUser", request);
+			rs = serviceInvoker.callService("UserService", "inqCntUser", request);
 			
 			if(rs != null) {
 				result = rs.payloadAsDataMap();
@@ -599,7 +599,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserInfo Exception 발생 : {}", e);
-			new BizException("inquiry_err");
+			throw new BizException("inquiry_err", e);
 		}
 		
 		return result;
@@ -610,7 +610,7 @@ public class UserServiceImpl implements UserService {
 		
 		DataMap<String, Object> params = null;
 		DataMap<String, Object> result = null;
-		Optional<UserEntity> userInfo = null;
+		Optional<UserEntity> userInfo = Optional.empty();
 		UserEntity userEntity  = null;
 		UserLogEntity userLogEntity = null;
 		UserGroupEntity userGroupEntity = null;
@@ -727,7 +727,7 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			// 이용자 변경로그 최대 일련번호 조회
 			//===================================================================================
-			maxSeq = userLogRepository.findMaxByTrnDtAndUid(header.getCurrDate(), uid);
+			maxSeq = userLogRepository.findMaxSeqByTrnDtAndUid(header.getCurrDate(), uid);
 			
 			log.debug("__DBGLOG__ 이용자변경로그 최대일련번호 조회 종료");
 			
@@ -789,7 +789,7 @@ public class UserServiceImpl implements UserService {
 			throw be;
 		} catch (Exception e) {
 			log.error("__ERRLOG__ createUser Exception 발생 : {}", e);
-			throw new BizException("process_err", e);
+			throw new BizException("reg_error_prefix", new String[] {"이용자"}, e);
 		}
 		
 		return result;
@@ -865,7 +865,7 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			// 비밀번호 오류내역 최대일련번호 조회
 			//===================================================================================
-			maxSeq = passwordErrorHistoryRepository.findMaxByTrnDtAndUid(header.getCurrDate(), uid);
+			maxSeq = passwordErrorHistoryRepository.findMaxSeqByTrnDtAndUid(header.getCurrDate(), uid);
 			
 			log.debug("__DBGLOG__ 현재 최대일련번호 [{}]", maxSeq);
 			
@@ -934,7 +934,7 @@ public class UserServiceImpl implements UserService {
 		DataMap<String, Object> params = null;
 		CommonHeader header = null;
 		
-		Optional<UserEntity> optionalUserEntity = null;
+		Optional<UserEntity> optionalUserEntity = Optional.empty();
 		UserEntity userEntity = null;
 		UserLogEntity userLogEntity = null;
 		String uid = "";
@@ -1024,7 +1024,7 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			// 이용자 변경로그 최대 일련번호 조회
 			//===================================================================================
-			maxSeq = userLogRepository.findMaxByTrnDtAndUid(header.getCurrDate(), uid);
+			maxSeq = userLogRepository.findMaxSeqByTrnDtAndUid(header.getCurrDate(), uid);
 			
 			log.debug("__DBGLOG__ 이용자변경로그 최대일련번호 조회 종료");
 			
@@ -1065,7 +1065,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ updateUser Exception 발생 : {}", e);
-			new BizException("inquiry_err", e);
+			throw new BizException("chg_error_prefix", new String[] {"이용자"}, e);
 		}
 		
 		return result;
@@ -1078,7 +1078,7 @@ public class UserServiceImpl implements UserService {
 		DataMap<String, Object> params = null;
 		CommonHeader header = null;
 		
-		Optional<UserEntity> optionalUserEntity = null;
+		Optional<UserEntity> optionalUserEntity = Optional.empty();
 		UserEntity userEntity = null;
 		UserLogEntity userLogEntity = null;
 		String uid = "";
@@ -1157,7 +1157,7 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			// 이용자 변경로그 최대 일련번호 조회
 			//===================================================================================
-			maxSeq = userLogRepository.findMaxByTrnDtAndUid(header.getCurrDate(), uid);
+			maxSeq = userLogRepository.findMaxSeqByTrnDtAndUid(header.getCurrDate(), uid);
 			
 			log.debug("__DBGLOG__ 이용자변경로그 최대일련번호 조회 종료");
 			
@@ -1198,7 +1198,50 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ deleteUser Exception 발생 : {}", e);
-			new BizException("inquiry_err", e);
+			throw new BizException("del_error_msg", new String[] {"이용자"}, e);
+		}
+		
+		return result;
+	}
+
+	@Override
+	public DataMap<String, Object> deleteManyUser(Request request) {
+		
+		DataMap<String, Object> result = null;
+		DataMap<String, Object> params = null;
+		CommonHeader header = null;
+		Request deleteRequest = null;
+		DataMap<String, Object> deleteParams = null;
+		List<String> uidList = null;
+		
+		try {
+			
+			//===================================================================================
+			// 변수 초기값 세팅
+			//===================================================================================
+			result = new DataMap<>();
+			header = request.getHeader();
+			params = request.getParameter();
+			deleteRequest = new Request();
+			
+			uidList = params.getList("uidList");
+			
+			log.debug("__DBGLOG__ uidList; [{}]", uidList);
+			
+			deleteRequest.setHeader(header);
+			
+			for(String uid:uidList) {
+				deleteParams = new DataMap<>();
+				deleteParams.put("uid", uid);
+				deleteRequest.setParameter(deleteParams);
+				serviceInvoker.callService("UserService", "deleteUser", deleteRequest);
+			}
+			
+		} catch (BizException be) {
+			throw be;	
+		} catch (Exception e) {
+			log.error("__ERRLOG__ deleteManyUser Exception 발생 : {}", e);
+			throw new BizException("del_error_msg", new String[] {"이용자"}, e);
 		}
 		
 		return result;

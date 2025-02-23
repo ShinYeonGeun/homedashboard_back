@@ -12,7 +12,7 @@ public class PasswordErrorHistoryDslRepositoryImpl implements PasswordErrorHisto
 	private JPAQueryFactory jpaQueryFactory;
 
 	@Override
-	public Integer findMaxByTrnDtAndUid(String trnDt, String uid) {
+	public Integer findMaxSeqByTrnDtAndUid(String trnDt, String uid) {
 		QPasswordErrorHistoryEntity entity = QPasswordErrorHistoryEntity.passwordErrorHistoryEntity;
 		
 		Integer result = jpaQueryFactory.select(entity.seq.max().coalesce(0))

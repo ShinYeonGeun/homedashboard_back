@@ -22,13 +22,22 @@ public class CommonController {
 	
 	@PostMapping("/callService")
 	public ResultSet callService(HttpServletRequest request) throws Exception {
+		log.debug("====================================================================================================");
+		log.debug("callService 시작");
+		log.debug("====================================================================================================");
 		
-		return trnCdService.executeService(request);
+		ResultSet rs = trnCdService.executeService(request);
+		
+		log.debug("====================================================================================================");
+		log.debug("callService 종료");
+		log.debug("====================================================================================================");
+		
+		return rs;
 	}
 	
 	@PostMapping(Constants.HEALTH_CHECK_URI)
 	public ResultSet healthCheck(HttpServletRequest request) throws Exception {
 		log.debug("HealthCheck 성공");
-		return new ResultSet(ResultCode.SUCCESS.getCode(), new Object[] {});
+		return new ResultSet(ResultCode.SUCCESS.getCode(), null, new Object[] {});
 	}
 }

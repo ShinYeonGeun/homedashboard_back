@@ -28,4 +28,6 @@ public interface UserService {
 	public DataMap<String, Object> updateUser(Request request);
 	
 	public DataMap<String, Object> deleteUser(Request request);
+	
+	public DataMap<String, Object> deleteManyUser(Request request);
 }
