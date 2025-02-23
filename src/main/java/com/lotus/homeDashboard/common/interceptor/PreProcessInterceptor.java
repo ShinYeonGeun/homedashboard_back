@@ -45,8 +45,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 	
 	@Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-		log.debug("__DBGLOG__ 전체 선처리 시작");
-
+		
 		ContentCachingRequestWrapper req = null;
 		TrnLogEntity logEntity = null;
 		CommonHeader header = null;
@@ -58,9 +57,27 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			// preflight 시 처리 안함
 			//===================================================================================
 			if(request.getMethod().equals(HttpMethod.OPTIONS.name())) {
-				log.error("@@@@@@@@@@@ preflight @@@@@@@@@@@@");
 				return true;
 			}
+			
+			//===================================================================================
+	    	//UUID 채번
+			//===================================================================================
+			UUID uuid = UUID.randomUUID();
+			request.setAttribute("uuid", uuid);
+			
+			//===================================================================================
+			// 로그에 UUID 추가
+			//===================================================================================
+			MDC.put("UUID", uuid.toString());
+			
+			log.debug("====================================================================================================");
+			log.debug("전체 선처리 시작");
+			log.debug("====================================================================================================");
+			
+			log.debug("----------------------------------------------------------------------------------------------------");
+			log.debug("거래코드(trnCd): [{}]", request.getHeader(Keys.TRN_CD.getKey()));
+			log.debug("----------------------------------------------------------------------------------------------------");
 			
 			//===================================================================================
 			// Body 재사용을 위해 Wrapping
@@ -72,11 +89,6 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			//===================================================================================
 			header = this.createCommonHeader(request);
 			req.setAttribute(Keys.COM_HEADER.getKey(), header);
-			
-			//===================================================================================
-			// 로그에 UUID 추가
-			//===================================================================================
-			MDC.put("UUID", header.getUuid().toString());
 			
 			//===================================================================================
 			// 거래로그 엔티티 조립
@@ -129,7 +141,9 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			} else {
 				msgKey = "login_need";
 			}
+			log.error("====================================================================================================");
 			log.error("__ERRLOR__ 전체 선처리 토큰 검증 오류", e);
+			log.error("====================================================================================================");
 			throw new LoginException(msgKey);
 		}catch(Exception e) {
 			log.error("__ERRLOR__ 전체 선처리 오류", e);
@@ -139,17 +153,18 @@ public class PreProcessInterceptor implements HandlerInterceptor {
     		throw e;
 		}finally {
 			
-			log.debug("__DBGLOG__ 전체 선처리 종료");
+			if(!request.getMethod().equals(HttpMethod.OPTIONS.name())) {
+				log.debug("====================================================================================================");
+				log.debug("전체 선처리 종료");
+				log.debug("====================================================================================================");
+			}
 		}
         return true;//HandlerInterceptor.super.preHandle(req, response, handler);
     }
 
     @Override
     public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
-    	log.debug("__DBGLOG__ postHandle 전체 후처리 시작");
-        log.debug("Request URI ===> " + request.getRequestURI());
 
-        log.debug("__DBGLOG__ postHandle 전체 후처리 종료");
         HandlerInterceptor.super.postHandle(request, response, handler, modelAndView);
     }
     
@@ -158,7 +173,6 @@ public class PreProcessInterceptor implements HandlerInterceptor {
      */
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-    	log.debug("__DBGLOG__ 전체 후처리 시작");
     	ContentCachingRequestWrapper req = null;
     	ContentCachingResponseWrapper res = null;
     	TrnLogEntity logEntity = null;
@@ -168,15 +182,18 @@ public class PreProcessInterceptor implements HandlerInterceptor {
     		req = (ContentCachingRequestWrapper) request;
     		res = (ContentCachingResponseWrapper) response;
     		
+    		if(request.getMethod().equals(HttpMethod.OPTIONS.name())) {
+				return;
+			}
+    		
+    		log.debug("====================================================================================================");
+			log.debug("전체 후처리 시작");
+			log.debug("====================================================================================================");
+    		
     		log.debug("__DBGLOG__ Request URI: [{}]", request.getRequestURI());
 	    	log.debug("__DBGLOG__ Response Status: [{}]", res.getStatus());
 	    	log.debug("__DBGLOG__ Response content: [{}]", new String(res.getContentAsByteArray()));
 	    	
-	    	if(request.getMethod().equals(HttpMethod.OPTIONS.name())) {
-				log.error("@@@@@@@@@@@ preflight @@@@@@@@@@@@");
-				return;
-			}
-	    	    	
 	    	//===================================================================================
 	    	// Body 재사용을 위해 Wrapping
 	    	//===================================================================================
@@ -237,9 +254,16 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 //	        trnLogService.saveTrnLogWithEntity(logEntity);
 	        
     	}catch(Exception e) {
+    		log.error("====================================================================================================");
     		log.error("__ERRLOR__ 전체 후처리 오류", e);
+    		log.error("====================================================================================================");
     	}finally {
-    		log.debug("__DBGLOG__ 전체 후처리 종료");
+    		if(!request.getMethod().equals(HttpMethod.OPTIONS.name())) {
+    			log.debug("====================================================================================================");
+    			log.debug("전체 후처리 종료");
+    			log.debug("====================================================================================================");
+        		
+    		}
 		}
     }
     
@@ -256,9 +280,10 @@ public class PreProcessInterceptor implements HandlerInterceptor {
     	String accessToken = "";
     	
     	try {
-    		
-    		log.debug("__DBGLOG__ createCommonHeader 시작");
-    		
+    		log.debug("====================================================================================================");
+    		log.debug("__DBGLOG__ createCommonHeader 공통헤더생성 시작");
+    		log.debug("====================================================================================================");
+			
     		req = (ContentCachingRequestWrapper) request;
     		
     		//===================================================================================
@@ -267,9 +292,9 @@ public class PreProcessInterceptor implements HandlerInterceptor {
     		header = new CommonHeader();;
     		
     		//===================================================================================
-	    	//UUID 채번
+	    	//UUID 가져옴.
     		//===================================================================================
-			UUID uuid = UUID.randomUUID();
+			UUID uuid = (UUID) req.getAttribute("uuid");
 			
 			//===================================================================================
 			// 공통헤더 데이터 적재
@@ -288,8 +313,8 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			//header.setTrnChnlCd(Constants.CHANNEL_CODE);
 			
 			//거래코드 조립
-			log.debug("__DBGLOG__ createHeader trnCd: [{}]", request.getHeader(Keys.TRAN_CD.getKey()));
-			header.setTrnCd(String.valueOf(request.getHeader(Keys.TRAN_CD.getKey())));
+			log.debug("__DBGLOG__ createHeader 거래코드(trnCd): [{}]", request.getHeader(Keys.TRN_CD.getKey()));
+			header.setTrnCd(String.valueOf(request.getHeader(Keys.TRN_CD.getKey())));
 			
 			//IP
 			header.setRequestIp(CommonUtil.getRequestIP(req));
@@ -326,11 +351,18 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			
 			log.debug("__DBGLOG__ Create Common Header : {}", header);
     	}catch(JWTVerificationException jve) {
-    		log.error("__ERRLOR__ createCommonHeader 토큰 검증오류", jve);
+    		log.error("====================================================================================================");
+    		log.error("__ERRLOR__ createCommonHeader 공통헤더생성 토큰 검증오류", jve);
+    		log.error("====================================================================================================");
     	}catch(Exception e) {
-    		log.error("__ERRLOR__ createCommonHeader 오류", e);
+    		log.error("====================================================================================================");
+    		log.error("__ERRLOR__ createCommonHeader 공통헤더생성 오류", e);
+    		log.error("====================================================================================================");
     	}finally {
-    		log.debug("__DBGLOG__ createCommonHeader 종료");
+    		log.debug("====================================================================================================");
+    		log.debug("__DBGLOG__ createCommonHeader 공통헤더생성 종료");
+    		log.debug("====================================================================================================");
+			
 		}
     	return header;
     }

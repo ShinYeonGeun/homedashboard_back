@@ -14,7 +14,7 @@ public class UserLogDslRepositoryImpl implements UserLogDslRepository {
 	private JPAQueryFactory jpaQueryFactory;
 	
 	@Override
-	public Integer findMaxByTrnDtAndUid(String trnDt, String uid) {
+	public Integer findMaxSeqByTrnDtAndUid(String trnDt, String uid) {
 		
 		QUserLogEntity userLogEntity = QUserLogEntity.userLogEntity;
 		

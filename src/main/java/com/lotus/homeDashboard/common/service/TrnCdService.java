@@ -19,4 +19,6 @@ public interface TrnCdService {
 	public DataMap<String, Object> updateTrnCd(Request request);
 	
 	public DataMap<String, Object> deleteTrnCd(Request request);
+	
+	public DataMap<String, Object> deleteManyTrnCd(Request request);
 }

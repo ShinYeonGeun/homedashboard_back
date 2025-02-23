@@ -40,13 +40,24 @@ public class DataMap <K,V> extends HashMap<K, V> {
 		return this.getString(k) == null ? defaultValue:this.getString(k);
 	}
 
+	public Integer getInteger(K k) {
+		
+		String str = this.getString(k);
+				
+		if(str == null) {
+			return null;
+		} 
+		
+		return str.trim().length() == 0 ? null : Integer.valueOf(str);
+	}
+	
 	public int getInt(K k) {
 		
 		if(super.get(k) == null) {
 			throw new NullPointerException();
 		}
 		
-		return Integer.valueOf(this.getString(k));
+		return Integer.parseInt(this.getString(k));
 	}
 	
 	public int getInt(K k, int defaultValue) {
@@ -64,7 +75,7 @@ public class DataMap <K,V> extends HashMap<K, V> {
 			throw new NullPointerException();
 		}
 		
-		return Long.valueOf(this.getString(k));
+		return Long.parseLong(this.getString(k));
 	}
 	
 	public long getLong(K k, long defaultValue) {

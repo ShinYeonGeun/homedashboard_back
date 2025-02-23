@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.lotus.homeDashboard.common.component.CommonHeader;
 import com.lotus.homeDashboard.common.component.DataMap;
@@ -35,6 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Service("TrnCdService")
 @Slf4j
+@Transactional
 public class TrnCdServiceImpl implements TrnCdService {
 	
 	@Autowired
@@ -47,12 +49,14 @@ public class TrnCdServiceImpl implements TrnCdService {
 	public ResultSet executeService(HttpServletRequest request) {
 		ResultSet rs = null;
 		CommonHeader header = null;
-		Optional<TrnCdEntity> trnCdEntity = null;
+		Optional<TrnCdEntity> trnCdEntity =  Optional.empty();
 		TrnCdEntity trnCd = null;
 		
 		try {
 			
-			log.debug("__DBGLOG__ callService 시작");
+			log.debug("====================================================================================================");
+			log.debug("executeService 시작");
+			log.debug("====================================================================================================");
 			
 			header = (CommonHeader) request.getAttribute(Keys.COM_HEADER.getKey());
 			
@@ -60,7 +64,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 				throw new BadRequestException("header is null");
 			}
 			
-			log.debug("__DBGLOG__ 거래코드: {}", header);
+			log.debug("__DBGLOG__ 입력 거래코드: {}", header);
 			
 			trnCdEntity = trnCdRepository.findById(header.getTrnCd());
 			
@@ -70,9 +74,21 @@ public class TrnCdServiceImpl implements TrnCdService {
 			
 			trnCd = trnCdEntity.get();
 			
+			log.debug("----------------------------------------------------------------------------------------------------");
+			log.debug(" 거래코드 조회결과");
+			log.debug("----------------------------------------------------------------------------------------------------");
+			log.debug("거래코드: [{}]", trnCd.getTrnCd());
+			log.debug("거래명 : [{}]", trnCd.getTrnNm());
+			log.debug("서비스명: [{}]", trnCd.getSvcNm());
+			log.debug("메소드명: [{}]", trnCd.getMtdNm());
+			log.debug("----------------------------------------------------------------------------------------------------");
+			
 			rs = caller.invokeRequiresNew(trnCd.getSvcNm(), trnCd.getMtdNm(), request, trnCd.getTmotMs());
 
-			log.debug("__DBGLOG__ callService 종료");
+			log.debug("====================================================================================================");
+			log.debug("executeService 종료");
+			log.debug("====================================================================================================");
+			
 			
 		} catch (BizException be) {
 			throw be;
@@ -164,7 +180,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqTrnCdList Exception 발생 : {}", e);
-			new BizException("inquiry_err", e);
+			throw new BizException("inquiry_err", e);
 		}
 		
 		return result;
@@ -223,7 +239,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqCntTrnCd Exception 발생 : {}", e);
-			new BizException("inquiry_err", e);
+			throw new BizException("inquiry_err", e);
 		}
 		
 		return result;
@@ -237,7 +253,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 		DataMap<String, Object> params = null;
 		CommonHeader header = null;
 		
-		Optional<TrnCdEntity> optioinalTrnCdEntity = null;
+		Optional<TrnCdEntity> optioinalTrnCdEntity =  Optional.empty();
 		TrnCdEntity trnCdEntity = null;
 		
 		String trnCd = "";
@@ -275,10 +291,15 @@ public class TrnCdServiceImpl implements TrnCdService {
 			//===================================================================================
 			optioinalTrnCdEntity = trnCdRepository.findById(trnCd);
 			if(optioinalTrnCdEntity.isPresent()) {
-				if(!Constants.YES.equals(optioinalTrnCdEntity.get().getDelYn())) {
+				trnCdEntity = optioinalTrnCdEntity.get();
+				
+				if(!Constants.YES.equals(trnCdEntity.getDelYn())) {
 					log.error("__ERRLOG__ 기등록된 거래코드 존재 [{}]", trnCd);
 					throw new BizException("reg_data_exists_msg", new String[] {StringUtil.concat("거래코드: ", trnCd)});
 				}
+				
+			} else {
+				trnCdEntity = new TrnCdEntity();
 			}
 			
 			log.debug("__DBGLOG__ 거래코드조회 종료");
@@ -287,7 +308,6 @@ public class TrnCdServiceImpl implements TrnCdService {
 			//===================================================================================
 			// 거래코드 등록
 			//===================================================================================
-			trnCdEntity = new TrnCdEntity();
 			trnCdEntity.setTrnCd(trnCd);
 			trnCdEntity.setTrnNm(params.getString("trnNm"));
 			trnCdEntity.setSvcNm(params.getString("svcNm"));
@@ -329,7 +349,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ createTrnCd Exception 발생 : {}", e);
-			new BizException("inquiry_err", e);
+			throw new BizException("reg_error_prefix", new String[] {"거래코드"}, e);
 		}
 		
 		return result;
@@ -343,7 +363,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 		DataMap<String, Object> params = null;
 		CommonHeader header = null;
 		
-		Optional<TrnCdEntity> optioinalTrnCdEntity = null;
+		Optional<TrnCdEntity> optioinalTrnCdEntity = Optional.empty();
 		TrnCdEntity trnCdEntity = null;
 		
 		String trnCd = "";
@@ -368,10 +388,10 @@ public class TrnCdServiceImpl implements TrnCdService {
 				throw new BizException("val_required", new String[] {"거래코드"}); 
 			}
 			
-			if(StringUtil.isEmpty(params.getString("delYn"))) {
-				log.error("__ERRLOG__ 삭제여부 미입력");
-				throw new BizException("val_required", new String[] {"삭제여부"}); 
-			}
+//			if(StringUtil.isEmpty(params.getString("delYn"))) {
+//				log.error("__ERRLOG__ 삭제여부 미입력");
+//				throw new BizException("val_required", new String[] {"삭제여부"}); 
+//			}
 			
 			log.debug("__DBGLOG__ 입력값 체크 종료");
 			log.debug("__DBGLOG__ 거래코드조회 시작");
@@ -392,7 +412,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			log.debug("__DBGLOG__ 거래코드수정 시작");
 			
 			//===================================================================================
-			// 거래코드 등록
+			// 거래코드 수정
 			//===================================================================================
 			trnCdEntity.setTrnCd(trnCd);
 			trnCdEntity.setTrnNm(params.getString("trnNm"));
@@ -423,13 +443,13 @@ public class TrnCdServiceImpl implements TrnCdService {
 			//===================================================================================
 			// 출력값 조립
 			//===================================================================================
-			result.put("trnCdInfo", optioinalTrnCdEntity.get());
+			result.put("trnCdInfo", trnCdEntity);
 			
 		} catch (BizException be) {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ updateTrnCd Exception 발생 : {}", e);
-			new BizException("inquiry_err", e);
+			throw new BizException("chg_error_prefix", new String[] {"거래코드"}, e);
 		}
 		
 		return result;
@@ -443,7 +463,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 		DataMap<String, Object> params = null;
 		CommonHeader header = null;
 		
-		Optional<TrnCdEntity> optioinalTrnCdEntity = null;
+		Optional<TrnCdEntity> optioinalTrnCdEntity =  Optional.empty();
 		TrnCdEntity trnCdEntity = null;
 		
 		String trnCd = "";
@@ -525,7 +545,51 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ deleteTrnCd Exception 발생 : {}", e);
-			new BizException("inquiry_err", e);
+			throw new BizException("del_error_msg", new String[] {"거래코드"}, e);
+		}
+		
+		return result;
+	}
+
+
+	@Override
+	public DataMap<String, Object> deleteManyTrnCd(Request request) {
+		
+		DataMap<String, Object> result = null;
+		DataMap<String, Object> params = null;
+		CommonHeader header = null;
+		Request deleteRequest = null;
+		DataMap<String, Object> deleteParams = null;
+		List<String> trnCdList = null;
+		
+		try {
+			
+			//===================================================================================
+			// 변수 초기값 세팅
+			//===================================================================================
+			result = new DataMap<>();
+			header = request.getHeader();
+			params = request.getParameter();
+			deleteRequest = new Request();
+			
+			trnCdList = params.getList("trnCdList");
+			
+			log.debug("__DBGLOG__ trnCdList; [{}]", trnCdList);
+			
+			deleteRequest.setHeader(header);
+			
+			for(String trnCd:trnCdList) {
+				deleteParams = new DataMap<>();
+				deleteParams.put("trnCd", trnCd);
+				deleteRequest.setParameter(deleteParams);
+				caller.callService("TrnCdService", "deleteTrnCd", deleteRequest);
+			}
+			
+		} catch (BizException be) {
+			throw be;	
+		} catch (Exception e) {
+			log.error("__ERRLOG__ deleteManyTrnCd Exception 발생 : {}", e);
+			throw new BizException("del_error_msg", new String[] {"거래코드"}, e);
 		}
 		
 		return result;

@@ -3,6 +3,7 @@ package com.lotus.homeDashboard.common.component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -14,7 +15,9 @@ import lombok.extern.slf4j.Slf4j;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ResultSet {
+	
 	private String resultCd;
+	private UUID uuid;
 	private Object payload;
 	
 	// 제네릭 메서드를 사용하여 특정 타입으로 캐스팅

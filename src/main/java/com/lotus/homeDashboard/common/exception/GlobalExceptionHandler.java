@@ -72,6 +72,7 @@ public class GlobalExceptionHandler {
 		//===================================================================================
         rs.setResultCd(ResultCode.ERROR.getCode());
         rs.setPayload(e.getMessage());
+        rs.setUuid(header.getUuid());
         
         log.debug("__DBGLOG__ handleBizExceptionException End");
         
