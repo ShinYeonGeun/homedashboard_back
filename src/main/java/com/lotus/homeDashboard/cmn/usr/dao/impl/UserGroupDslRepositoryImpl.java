@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import com.lotus.homeDashboard.cmn.usr.dao.UserGroupDslRepository;
 import com.lotus.homeDashboard.cmn.usr.entity.QGroupEntity;
 import com.lotus.homeDashboard.cmn.usr.entity.QUserGroupEntity;
+import com.lotus.homeDashboard.common.constants.Constants;
 import com.lotus.homeDashboard.common.utils.StringUtil;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.Tuple;
@@ -33,7 +34,8 @@ public class UserGroupDslRepositoryImpl implements UserGroupDslRepository {
 							.select(userGroupEntity, groupEntity)
 							.from(userGroupEntity)
 							.leftJoin(groupEntity)
-							.on(userGroupEntity.grpCd.eq(groupEntity.grpCd));
+							.on(userGroupEntity.grpCd.eq(groupEntity.grpCd)
+								, groupEntity.grpCd.eq(Constants.NO));
 		
 		
 		if(!StringUtil.isEmpty(delYn)) {

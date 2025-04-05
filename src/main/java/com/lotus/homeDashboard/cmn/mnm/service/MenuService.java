@@ -21,4 +21,8 @@ public interface MenuService {
 	public DataMap<String, Object> deleteMenu(Request request);
 	
 	public DataMap<String, Object> deleteManyMenu(Request request);
+	
+	public DataMap<String, Object> inqMenusByGroupPermissions(Request request);
+	
+	public DataMap<String, Object> saveMenusByGroupPermissions(Request request);
 }

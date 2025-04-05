@@ -1,8 +1,14 @@
 package com.lotus.homeDashboard.common.service.impl;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.coyote.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,13 +29,21 @@ import com.lotus.homeDashboard.common.component.ServiceInvoker;
 import com.lotus.homeDashboard.common.constants.Constants;
 import com.lotus.homeDashboard.common.constants.Keys;
 import com.lotus.homeDashboard.common.dao.TrnCdRepository;
+import com.lotus.homeDashboard.common.dao.TrnGroupAuthorityLogRepository;
+import com.lotus.homeDashboard.common.dao.TrnGroupAuthorityRepository;
 import com.lotus.homeDashboard.common.dao.spec.CommonSpecification;
+import com.lotus.homeDashboard.common.entity.QTrnCdEntity;
+import com.lotus.homeDashboard.common.entity.QTrnGroupAuthorityEntity;
 import com.lotus.homeDashboard.common.entity.TrnCdEntity;
+import com.lotus.homeDashboard.common.entity.TrnGroupAuthorityEntity;
+import com.lotus.homeDashboard.common.entity.TrnGroupAuthorityKeyEntity;
+import com.lotus.homeDashboard.common.entity.TrnGroupAuthorityLogEntity;
 import com.lotus.homeDashboard.common.exception.BizException;
 import com.lotus.homeDashboard.common.service.TrnCdService;
 import com.lotus.homeDashboard.common.spec.TrnCdSpecification;
 import com.lotus.homeDashboard.common.utils.CommonUtil;
 import com.lotus.homeDashboard.common.utils.StringUtil;
+import com.querydsl.core.Tuple;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +57,12 @@ public class TrnCdServiceImpl implements TrnCdService {
 	private TrnCdRepository trnCdRepository;
 	
 	@Autowired
+	private TrnGroupAuthorityRepository trnGroupAuthorityRepository;
+	
+	@Autowired
+	private TrnGroupAuthorityLogRepository trnGroupAuthorityLogRepository;
+	
+	@Autowired
 	private ServiceInvoker caller;
 	
 	@Override
@@ -51,6 +71,8 @@ public class TrnCdServiceImpl implements TrnCdService {
 		CommonHeader header = null;
 		Optional<TrnCdEntity> trnCdEntity =  Optional.empty();
 		TrnCdEntity trnCd = null;
+		
+		long authCnt = 0L;
 		
 		try {
 			
@@ -66,21 +88,41 @@ public class TrnCdServiceImpl implements TrnCdService {
 			
 			log.debug("__DBGLOG__ 입력 거래코드: {}", header);
 			
+			log.debug("----------------------------------------------------------------------------------------------------");
+			log.debug(" 거래코드조회 시작");
+			log.debug("----------------------------------------------------------------------------------------------------");
+			
 			trnCdEntity = trnCdRepository.findById(header.getTrnCd());
 			
 			if(trnCdEntity.isEmpty()) {
-				throw new BizException("service_not_found");
+				throw new BizException("error.service.not-found");
 			}
 			
 			trnCd = trnCdEntity.get();
 			
 			log.debug("----------------------------------------------------------------------------------------------------");
-			log.debug(" 거래코드 조회결과");
+			log.debug(" 거래코드조회 결과");
 			log.debug("----------------------------------------------------------------------------------------------------");
 			log.debug("거래코드: [{}]", trnCd.getTrnCd());
 			log.debug("거래명 : [{}]", trnCd.getTrnNm());
 			log.debug("서비스명: [{}]", trnCd.getSvcNm());
 			log.debug("메소드명: [{}]", trnCd.getMtdNm());
+			log.debug("----------------------------------------------------------------------------------------------------");
+			
+			log.debug("----------------------------------------------------------------------------------------------------");
+			log.debug(" 거래권한조회 시작");
+			log.debug("----------------------------------------------------------------------------------------------------");
+			
+			authCnt = trnCdRepository.findCountTrnGroupAuth(trnCd.getTrnCd(), header.getTrnUserId());
+			log.debug("거래권한 개수: [{}]", authCnt);
+			
+			if(authCnt < 1L) {
+				log.error("__ERRLOG__ 서비스 실행권한 없음.");
+				throw new BizException("error.service.auth.forbidden"); 
+			}
+			
+			log.debug("----------------------------------------------------------------------------------------------------");
+			log.debug(" 거래권한조회 결과");
 			log.debug("----------------------------------------------------------------------------------------------------");
 			
 			rs = caller.invokeRequiresNew(trnCd.getSvcNm(), trnCd.getMtdNm(), request, trnCd.getTmotMs());
@@ -94,7 +136,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;
 			
 		} catch (Exception e) {
-			throw new BizException("service_invoke_err", e);
+			throw new BizException("error.service.invoke", e);
 		}
 		
 		return rs;
@@ -163,6 +205,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 					data.put("trnNm", entity.getTrnNm());
 					data.put("svcNm", entity.getSvcNm());
 					data.put("mtdNm", entity.getMtdNm());
+					data.put("description", entity.getDescription());
 					data.put("tmotMs", entity.getTmotMs());
 					data.put("delYn", entity.getDelYn());
 					data.put("lastTrnDtm", entity.getLastTrnDtm());
@@ -180,7 +223,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqTrnCdList Exception 발생 : {}", e);
-			throw new BizException("inquiry_err", e);
+			throw new BizException("error.inquiry", e);
 		}
 		
 		return result;
@@ -239,7 +282,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqCntTrnCd Exception 발생 : {}", e);
-			throw new BizException("inquiry_err", e);
+			throw new BizException("error.inquiry", e);
 		}
 		
 		return result;
@@ -275,12 +318,12 @@ public class TrnCdServiceImpl implements TrnCdService {
 			//===================================================================================
 			if(StringUtil.isEmpty(trnCd)) {
 				log.error("__ERRLOG__ 거래코드 미입력");
-				throw new BizException("val_required", new String[] {"거래코드"}); 
+				throw new BizException("error.required", new String[] {"거래코드"}); 
 			}
 			
 			if(StringUtil.isEmpty(params.getString("delYn"))) {
 				log.error("__ERRLOG__ 삭제여부 미입력");
-				throw new BizException("val_required", new String[] {"삭제여부"}); 
+				throw new BizException("error.required", new String[] {"삭제여부"}); 
 			}
 			
 			log.debug("__DBGLOG__ 입력값 체크 종료");
@@ -290,12 +333,13 @@ public class TrnCdServiceImpl implements TrnCdService {
 			// 거래코드 조회
 			//===================================================================================
 			optioinalTrnCdEntity = trnCdRepository.findById(trnCd);
+			
 			if(optioinalTrnCdEntity.isPresent()) {
 				trnCdEntity = optioinalTrnCdEntity.get();
 				
 				if(!Constants.YES.equals(trnCdEntity.getDelYn())) {
 					log.error("__ERRLOG__ 기등록된 거래코드 존재 [{}]", trnCd);
-					throw new BizException("reg_data_exists_msg", new String[] {StringUtil.concat("거래코드: ", trnCd)});
+					throw new BizException("error.regist.data.exists.msg", new String[] {StringUtil.concat("거래코드: ", trnCd)});
 				}
 				
 			} else {
@@ -312,6 +356,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			trnCdEntity.setTrnNm(params.getString("trnNm"));
 			trnCdEntity.setSvcNm(params.getString("svcNm"));
 			trnCdEntity.setMtdNm(params.getString("mtdNm"));
+			trnCdEntity.setDescription(params.getString("description"));
 			trnCdEntity.setTmotMs(params.getLong("tmotMs", 0L));
 			trnCdEntity.setDelYn(Constants.NO);
 			trnCdEntity.setLastTrnUUID(header.getUuid());
@@ -322,7 +367,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 				trnCdRepository.saveAndFlush(trnCdEntity);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ createTrnCd DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"거래코드"}, e);
+				throw new BizException("error.regist.prefix", new String[] {"거래코드"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 거래코드등록 종료");
@@ -335,7 +380,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			
 			if(optioinalTrnCdEntity.isEmpty()) {
 				log.error("__ERRLOG__ createTrnCd 등록 후 조회 NOT FOUND");
-				throw new BizException("not_found_msg", new String[] {StringUtil.concat("거래코드:", trnCd)});
+				throw new BizException("error.data.not-found.msg", new String[] {StringUtil.concat("거래코드:", trnCd)});
 			}
 			
 			log.debug("__DBGLOG__ 등록된 거래코드 조회 종료");
@@ -349,7 +394,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ createTrnCd Exception 발생 : {}", e);
-			throw new BizException("reg_error_prefix", new String[] {"거래코드"}, e);
+			throw new BizException("error.regist.prefix", new String[] {"거래코드"}, e);
 		}
 		
 		return result;
@@ -385,12 +430,12 @@ public class TrnCdServiceImpl implements TrnCdService {
 			//===================================================================================
 			if(StringUtil.isEmpty(trnCd)) {
 				log.error("__ERRLOG__ 거래코드 미입력");
-				throw new BizException("val_required", new String[] {"거래코드"}); 
+				throw new BizException("error.required", new String[] {"거래코드"}); 
 			}
 			
 //			if(StringUtil.isEmpty(params.getString("delYn"))) {
 //				log.error("__ERRLOG__ 삭제여부 미입력");
-//				throw new BizException("val_required", new String[] {"삭제여부"}); 
+//				throw new BizException("error.required", new String[] {"삭제여부"}); 
 //			}
 			
 			log.debug("__DBGLOG__ 입력값 체크 종료");
@@ -403,7 +448,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			
 			if(optioinalTrnCdEntity.isEmpty() || Constants.YES.equals(optioinalTrnCdEntity.get().getDelYn())) {
 				log.error("__ERRLOG__ 등록된 거래코드 미존재 [{}]", trnCd);
-				throw new BizException("not_found_msg", new String[] {StringUtil.concat("거래코드: ", trnCd)});
+				throw new BizException("error.data.not-found.msg", new String[] {StringUtil.concat("거래코드: ", trnCd)});
 			} else {
 				trnCdEntity = optioinalTrnCdEntity.get();
 			}
@@ -418,6 +463,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			trnCdEntity.setTrnNm(params.getString("trnNm"));
 			trnCdEntity.setSvcNm(params.getString("svcNm"));
 			trnCdEntity.setMtdNm(params.getString("mtdNm"));
+			trnCdEntity.setDescription(params.getString("description"));
 			trnCdEntity.setTmotMs(params.getLong("tmotMs", 0L));
 			trnCdEntity.setDelYn(Constants.NO);
 			trnCdEntity.setLastTrnUUID(header.getUuid());
@@ -430,12 +476,12 @@ public class TrnCdServiceImpl implements TrnCdService {
 				
 				if(trnCdEntity == null) {
 					log.error("__ERRLOG__ updateTrnCd saveAndFlush null");
-					throw new BizException("chg_error_prefix", new String[] {"거래코드"});
+					throw new BizException("error.modify.prefix", new String[] {"거래코드"});
 				}
 				
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ updateTrnCd DataAccessException 발생 : {}", e);
-				throw new BizException("chg_error_prefix", new String[] {"거래코드"}, e);
+				throw new BizException("error.modify.prefix", new String[] {"거래코드"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 거래코드수정 종료");
@@ -449,7 +495,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ updateTrnCd Exception 발생 : {}", e);
-			throw new BizException("chg_error_prefix", new String[] {"거래코드"}, e);
+			throw new BizException("error.modify.prefix", new String[] {"거래코드"}, e);
 		}
 		
 		return result;
@@ -485,7 +531,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			//===================================================================================
 			if(StringUtil.isEmpty(trnCd)) {
 				log.error("__ERRLOG__ 거래코드 미입력");
-				throw new BizException("val_required", new String[] {"거래코드"}); 
+				throw new BizException("error.required", new String[] {"거래코드"}); 
 			}
 			
 			
@@ -499,12 +545,12 @@ public class TrnCdServiceImpl implements TrnCdService {
 			
 			if(optioinalTrnCdEntity.isEmpty()) {
 				log.error("__ERRLOG__ 거래코드 미존재 [{}]", trnCd);
-				throw new BizException("not_found_msg", new String[] {StringUtil.concat("거래코드: ", trnCd)});
+				throw new BizException("error.data.not-found.msg", new String[] {StringUtil.concat("거래코드: ", trnCd)});
 			}
 			
 			if(Constants.YES.equals(optioinalTrnCdEntity.get().getDelYn())) {
 				log.error("__ERRLOG__ 이미 삭제된 거래코드 [{}]", trnCd);
-				throw new BizException("del_already_msg", new String[] {StringUtil.concat("거래코드: ", trnCd)});
+				throw new BizException("error.delete.already_msg", new String[] {StringUtil.concat("거래코드: ", trnCd)});
 			}
 			
 			log.debug("__DBGLOG__ 거래코드조회 종료");
@@ -526,12 +572,12 @@ public class TrnCdServiceImpl implements TrnCdService {
 				
 				if(trnCdEntity == null) {
 					log.error("__ERRLOG__ deleteTrnCd saveAndFlush null");
-					throw new BizException("del_error_msg", new String[] {"거래코드"});
+					throw new BizException("error.delete.msg", new String[] {"거래코드"});
 				}
 				
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ deleteTrnCd DataAccessException 발생 : {}", e);
-				throw new BizException("del_error_msg", new String[] {"거래코드"}, e);
+				throw new BizException("error.delete.msg", new String[] {"거래코드"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 거래코드수정 종료");
@@ -545,7 +591,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ deleteTrnCd Exception 발생 : {}", e);
-			throw new BizException("del_error_msg", new String[] {"거래코드"}, e);
+			throw new BizException("error.delete.msg", new String[] {"거래코드"}, e);
 		}
 		
 		return result;
@@ -589,9 +635,252 @@ public class TrnCdServiceImpl implements TrnCdService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ deleteManyTrnCd Exception 발생 : {}", e);
-			throw new BizException("del_error_msg", new String[] {"거래코드"}, e);
+			throw new BizException("error.delete.msg", new String[] {"거래코드"}, e);
 		}
 		
 		return result;
+	}
+
+
+	@Override
+	public DataMap<String, Object> inqTranByGroupPermissions(Request request) {
+		
+		DataMap<String, Object> result = null;
+		DataMap<String, Object> params = null;
+		String grpCd = null;
+		List<Tuple> inqList = null;
+		Set<DataMap<String, Object>> svcSet = null;
+		List<DataMap<String, Object>> svcList = null;
+		
+		try {
+			
+			//===================================================================================
+			// 변수 초기값 세팅
+			//===================================================================================
+			result = new DataMap<>();
+			params = request.getParameter();
+			svcList = new ArrayList<>();
+			grpCd = params.getString("grpCd");
+			
+			//===================================================================================
+			// 필수값 체크
+			//===================================================================================
+			if(StringUtil.isEmpty(grpCd)) {
+				log.error("__ERRLOG__ 그룹코드 미입력");
+				throw new BizException("error.required", new String[] {"grpCd"}); 
+			}
+			
+			//===================================================================================
+			// 거래코드 조회
+			//===================================================================================
+			inqList = trnCdRepository.findAllSvcMthByGrpPermissions(grpCd, Constants.NO);
+			svcSet = new HashSet<>();
+			
+			for(Tuple t : inqList) {
+				DataMap<String, Object> map = new DataMap<>();
+				map.put("svcNm", t.get(QTrnCdEntity.trnCdEntity).getSvcNm());
+				map.put("trnCd", t.get(QTrnCdEntity.trnCdEntity).getSvcNm());
+				svcSet.add(map);
+			}
+			
+			for(DataMap<String, Object> svcs : svcSet) {
+				List<DataMap<String, Object>> childrens = new ArrayList<>();
+				for(Tuple t : inqList) {
+					log.debug("__DBGLOG__ tuple: {}", t);
+					DataMap<String, Object> map = new DataMap<>();
+					if(svcs.getString("svcNm").equals(t.get(QTrnCdEntity.trnCdEntity).getSvcNm())) {
+						map.put("trnCd", t.get(QTrnCdEntity.trnCdEntity).getTrnCd());
+						map.put("trnNm", t.get(QTrnCdEntity.trnCdEntity).getTrnNm());
+						map.put("mtdNm", t.get(QTrnCdEntity.trnCdEntity).getMtdNm());
+						
+						if(t.get(QTrnGroupAuthorityEntity.trnGroupAuthorityEntity) == null) {
+							map.put("grpCd", "");
+						} else {
+							map.put("grpCd", t.get(QTrnGroupAuthorityEntity.trnGroupAuthorityEntity).getGrpCd());
+						}
+						map.put("svcNm", t.get(QTrnCdEntity.trnCdEntity).getMtdNm());
+//						map.put("svcNm", StringUtil.concat(t.get(QTrnCdEntity.trnCdEntity).getMtdNm()
+//														 , " "
+//														 , "["
+//														 , t.get(QTrnCdEntity.trnCdEntity).getTrnNm()
+//														 , "/"
+//														 , t.get(QTrnCdEntity.trnCdEntity).getTrnCd()
+//														 , "]"));
+						childrens.add(map);
+					}
+				}
+				
+				//메소드명 정렬
+				childrens.sort(Comparator.comparing(
+					(DataMap<String, Object> dataMap) -> dataMap.getString("mtdNm")
+				));
+				svcs.put("children", childrens);
+			}
+			
+			svcList = new ArrayList<>(svcSet);
+			
+			//서비스명 정렬
+			svcList.sort(Comparator.comparing(
+				(DataMap<String, Object> map) -> map.getString("svcNm")
+			));
+			
+			//===================================================================================
+			// 출력값 조립
+			//===================================================================================
+			result.put("svcList", svcList);
+			
+		} catch (BizException be) {
+			throw be;	
+		} catch (Exception e) {
+			log.error("__ERRLOG__ inqTranByGroupPermissions Exception 발생 : {}", e);
+			throw new BizException("error.data.not-found.msg", new String[] {"거래권한"}, e);
+		}
+		
+		return result;
+	}
+
+
+	@Override
+	public DataMap<String, Object> saveTranByGroupPermissions(Request request) {
+		DataMap<String, Object> result = null;
+		DataMap<String, Object> params = null;
+		CommonHeader header = null;
+		String grpCd = null;
+		List<String> trnCds = null;
+		List<TrnGroupAuthorityEntity> trnAuthList = null;
+		
+		Set<String> newTrnCds = null;
+		Set<String> delTrnCds = null;
+		Set<String> trnCdSet = null;
+		Set<String> trnAuthIdSet = null;
+		
+		TrnGroupAuthorityEntity trnGrpEntity = null;
+		
+		try {
+			
+			//===================================================================================
+			// 변수 초기값 세팅
+			//===================================================================================
+			result = new DataMap<>();
+			params = request.getParameter();
+			header = request.getHeader();
+			trnCds = params.getList("trnCds");
+			trnCdSet = new HashSet<>(trnCds);
+			grpCd = params.getString("grpCd");
+			
+			//===================================================================================
+			// 필수값 체크
+			//===================================================================================
+			if(StringUtil.isEmpty(grpCd)) {
+				log.error("__ERRLOG__ 그룹코드 미입력");
+				throw new BizException("error.required", new String[] {"grpCd"}); 
+			}
+			
+			//===================================================================================
+			// 해당 그룹의 메뉴권한 조회
+			//===================================================================================
+			trnAuthList = trnGroupAuthorityRepository.findAllByGrpCdAndDelYn(grpCd, Constants.NO);
+			trnAuthIdSet = new HashSet<>(trnAuthList.stream().map(item -> item.getTrnCd()).collect(Collectors.toList()));
+			log.debug("__DBGLOG__ 권한목록 {}", trnAuthList);
+			
+			//신규 메뉴ID
+			newTrnCds = new HashSet<>(trnCdSet);
+			newTrnCds.removeAll(trnAuthIdSet);
+			
+			log.debug("__DBGLOG__ new권한목록 {}", newTrnCds);
+			
+			//삭제 메뉴ID
+			delTrnCds = new HashSet<>(trnAuthIdSet);
+			delTrnCds.removeAll(trnCdSet);
+			
+			log.debug("__DBGLOG__ 삭제권한목록 {}", delTrnCds);
+			
+			//===================================================================================
+			// 권한 및 로그등록
+			//===================================================================================
+			for(String newTrnCd : newTrnCds) {
+				//권한등록
+				trnGrpEntity = new TrnGroupAuthorityEntity();
+				trnGrpEntity.setTrnCd(newTrnCd);
+				trnGrpEntity.setGrpCd(grpCd);
+				trnGrpEntity.setChgUid(header.getTrnUserId());
+				trnGrpEntity.setChgDtm(header.getCurrDtm());
+				trnGrpEntity.setDelYn(Constants.NO);
+				trnGrpEntity.setLastTrnUUID(header.getUuid());
+				trnGrpEntity.setLastTrnUid(header.getTrnUserId());
+				trnGrpEntity.setLastTrnCd(header.getTrnCd());
+				
+				try {
+					
+					trnGroupAuthorityRepository.saveAndFlush(trnGrpEntity);
+					
+				} catch (DataAccessException e) {
+					log.error("__ERRLOG__ saveMenusByGroupPermissions DataAccessException 발생 : {}", e);
+					throw new BizException("error.delete.prefix", new String[] {"메뉴권한"}, e);
+				}
+				
+				//로그등록
+				saveTranByGroupPermissions(newTrnCd, grpCd, Constants.CHG_TYPE_CD.CREATE.getCode(), header.getCurrDtm(), header.getUuid(), header.getTrnUserId(), header.getTrnCd());
+				
+			}
+			
+			//===================================================================================
+			// 권한삭제 및 로그등록
+			//===================================================================================
+			for(String delTrnCd : delTrnCds) {
+				//권한삭제
+				TrnGroupAuthorityKeyEntity key = new TrnGroupAuthorityKeyEntity(delTrnCd, grpCd);
+				try {
+					
+					trnGroupAuthorityRepository.deleteById(key);
+					
+				} catch (DataAccessException e) {
+					log.error("__ERRLOG__ saveMenusByGroupPermissions DataAccessException 발생 : {}", e);
+					throw new BizException("error.regist.prefix", new String[] {"메뉴권한"}, e);
+				}
+				
+				//로그등록
+				saveTranByGroupPermissions(delTrnCd, grpCd, Constants.CHG_TYPE_CD.DELETE.getCode(), header.getCurrDtm(), header.getUuid(), header.getTrnUserId(), header.getTrnCd());
+				
+			}
+			
+			//===================================================================================
+			// 출력값 조립
+			//===================================================================================
+			
+		} catch (BizException be) {
+			throw be;	
+		} catch (Exception e) {
+			log.error("__ERRLOG__ saveTranByGroupPermissions Exception 발생 : {}", e);
+			throw new BizException("error.regist.prefix", new String[] {"거래권한"}, e);
+		}
+		
+		return result;
+	}
+	
+	private void saveTranByGroupPermissions(String trnCd, String grpCd, String chgTypeCd, Instant trnDtm, UUID uuid, String uid, String execTrnCd) {
+		TrnGroupAuthorityLogEntity logEntity = null;
+		
+		int seq = 0;
+		
+		try {
+			
+			seq = trnCdRepository.findMaxTrnAuthLogSeq(trnCd, grpCd);
+			logEntity = new  TrnGroupAuthorityLogEntity();
+			logEntity.setTrnCd(trnCd);
+			logEntity.setGrpCd(grpCd);
+			logEntity.setSeq(++seq);
+			logEntity.setTrnDtm(trnDtm);
+			logEntity.setAuthChgTypeCd(chgTypeCd);
+			logEntity.setLastTrnUUID(uuid);
+			logEntity.setLastTrnUid(uid);
+			logEntity.setLastTrnCd(execTrnCd);
+			
+			trnGroupAuthorityLogRepository.saveAndFlush(logEntity);
+			
+		} catch (DataAccessException e) {
+			log.error("__ERRLOG__ saveTranByGroupPermissions DataAccessException 발생 : {}", e);
+			throw new BizException("error.regist.prefix", new String[] {"거래권한로그"}, e);
+		}
 	}
 }

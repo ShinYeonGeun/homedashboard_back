@@ -67,22 +67,22 @@ public class EncryptUtil {
 					
 		} catch (InvalidKeyException e) {
 			log.error("__ERRLOG__ AES256 암호화 InvalidKeyException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.encrypt");
 		} catch (InvalidAlgorithmParameterException e) {
 			log.error("__ERRLOG__ AES256 암호화 InvalidAlgorithmParameterException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.encrypt");
 		} catch (NoSuchAlgorithmException e) {
 			log.error("__ERRLOG__ AES256 암호화 NoSuchAlgorithmException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.encrypt");
 		} catch (NoSuchPaddingException e) {
 			log.error("__ERRLOG__ AES256 암호화 NoSuchPaddingException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.encrypt");
 		} catch (IllegalBlockSizeException e) {
 			log.error("__ERRLOG__ AES256 암호화 IllegalBlockSizeException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.encrypt");
 		} catch (BadPaddingException e) {
 			log.error("__ERRLOG__ AES256 암호화 BadPaddingException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.encrypt");
 		}
 		
 		return result;
@@ -113,22 +113,22 @@ public class EncryptUtil {
 					
 		} catch (InvalidKeyException e) {
 			log.error("__ERRLOG__ AES256 암호화 InvalidKeyException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.decrypt");
 		} catch (InvalidAlgorithmParameterException e) {
 			log.error("__ERRLOG__ AES256 암호화 InvalidAlgorithmParameterException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.decrypt");
 		} catch (NoSuchAlgorithmException e) {
 			log.error("__ERRLOG__ AES256 암호화 NoSuchAlgorithmException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.decrypt");
 		} catch (NoSuchPaddingException e) {
 			log.error("__ERRLOG__ AES256 암호화 NoSuchPaddingException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.decrypt");
 		} catch (IllegalBlockSizeException e) {
 			log.error("__ERRLOG__ AES256 암호화 IllegalBlockSizeException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.decrypt");
 		} catch (BadPaddingException e) {
 			log.error("__ERRLOG__ AES256 암호화 BadPaddingException 오류", e);
-			throw new BizException("enc_err");
+			throw new BizException("error.decrypt");
 		}
 		
 		return result;

@@ -112,13 +112,13 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			} else {
 				
 				if(!Constants.AUTH.equals(header.getAuthorization())){
-					throw new LoginException("val_invalid_auth");
+					throw new LoginException("error.invalid.auth");
 				}
 				
 				tokenInfo = jWTProvider.validate(header.getAccessToken());
 				
 				if(tokenInfo == null) {
-					throw new LoginException("login_need");
+					throw new LoginException("error.login.not-login");
 				}
 				
 				response.setHeader(Keys.ACCESS_TOKEN.getKey(), header.getAccessToken());
@@ -137,9 +137,9 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			//JWTVerificationException
 			String msgKey = "";
 			if(e instanceof TokenExpiredException) {
-				msgKey = "login_exp_token";
+				msgKey = "error.login.token.expired";
 			} else {
-				msgKey = "login_need";
+				msgKey = "error.login.not-login";
 			}
 			log.error("====================================================================================================");
 			log.error("__ERRLOR__ 전체 선처리 토큰 검증 오류", e);

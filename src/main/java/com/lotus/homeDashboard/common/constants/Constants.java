@@ -22,4 +22,23 @@ public class Constants {
 	
 	public static final int SVC_INVOKER_POOL_SIZE = 10; //serviceInvoker threadpool size
 	
+	
+	public enum CHG_TYPE_CD {
+		
+		CREATE("C"),
+		MODIFY("U"),
+		DELETE("D")
+		;
+		
+		private String code;
+
+		private CHG_TYPE_CD(String code) {
+			this.code = code;
+		}
+
+		public String getCode() {
+			return code;
+		}
+	}
+	
 }

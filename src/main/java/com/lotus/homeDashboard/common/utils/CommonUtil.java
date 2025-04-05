@@ -1,16 +1,11 @@
 package com.lotus.homeDashboard.common.utils;
 
-import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
-import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.lotus.homeDashboard.common.component.CommonEntity;
-import com.lotus.homeDashboard.common.component.CommonHeader;
 import com.lotus.homeDashboard.common.component.DataMap;
-import com.lotus.homeDashboard.common.exception.BizException;
 
 import jakarta.servlet.http.HttpServletRequest;
 

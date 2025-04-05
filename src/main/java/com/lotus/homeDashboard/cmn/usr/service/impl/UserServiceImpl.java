@@ -117,12 +117,12 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			if(StringUtil.isEmpty(params.getString("loginId"))) {
 				log.error("__ERRLOG__ 로그인ID 미입력");
-				throw new BizException("val_required", new String[] {"로그인ID"}); 
+				throw new BizException("error.required", new String[] {"로그인ID"}); 
 			}
 			
 			if(StringUtil.isEmpty(params.getString("pswd"))) {
 				log.error("__ERRLOG__ 비밀번호 미입력");
-				throw new BizException("val_required", new String[] {"비밀번호"}); 
+				throw new BizException("error.required", new String[] {"비밀번호"}); 
 			}
 			
 			//===================================================================================
@@ -141,19 +141,19 @@ public class UserServiceImpl implements UserService {
 			
 			//ID 체크
 			if(userEntity.isEmpty()) {
-				throw new BizException("login_not_found_id"); 
+				throw new BizException("error.login.id.not-found"); 
 			} 
 			
 			userInfo = userEntity.get();
 			
 			//삭제여부 체크
 			if(Constants.YES.equals(userInfo.getDelYn())) {
-				throw new BizException("login_deleted_id");
+				throw new BizException("error.login.id.deleted");
 			}
 			
 			//잠금여부 체크
 			if(UserConstants.USER_STATE.LOCKED.getCode().equals(userInfo.getUserState())) {
-				throw new BizException("login_lock_id");
+				throw new BizException("error.login.id.locked");
 			}
 			
 			//비밀번호 복호화
@@ -184,11 +184,11 @@ public class UserServiceImpl implements UserService {
 					DataMap<String, Object> data = handleInvalidPswdResult.payloadAsDataMap();
 					
 					if(UserConstants.USER_STATE.LOCKED.getCode().equals(data.getString("userState", ""))) {
-						throw new BizException("login_pswd_not_match_lock", new String[] {String.valueOf(UserConstants.MAX_PSWD_ERR_CNT)}); 
+						throw new BizException("error.login.pswd.not-match-lock", new String[] {String.valueOf(UserConstants.MAX_PSWD_ERR_CNT)}); 
 					}
 				}
 				
-				throw new BizException("login_pswd_not_match"); 
+				throw new BizException("error.login.pswd.not-matched"); 
 			}
 			
 			//===================================================================================
@@ -203,7 +203,7 @@ public class UserServiceImpl implements UserService {
 				userRepository.saveAndFlush(userInfo);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ login DataAccessException 발생 : {}", e);
-				throw new BizException("chg_error_prefix", new String[] {"로그인 정보"}, e);
+				throw new BizException("error.modify.prefix", new String[] {"로그인 정보"}, e);
 			}
 			
 			//===================================================================================
@@ -229,7 +229,7 @@ public class UserServiceImpl implements UserService {
 				loginHistoryRepository.saveAndFlush(historyEntity);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ login DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"로그인 이력"},e);
+				throw new BizException("error.regist.prefix", new String[] {"로그인 이력"},e);
 			}
 			
 			//===================================================================================
@@ -253,7 +253,7 @@ public class UserServiceImpl implements UserService {
 				userTokenRepository.saveAndFlush(tokenEntity);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ login DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"로그인 토큰"},e);
+				throw new BizException("error.regist.prefix", new String[] {"로그인 토큰"},e);
 			}
 			
 			//===================================================================================
@@ -306,7 +306,7 @@ public class UserServiceImpl implements UserService {
 			log.error("_ERRLOG__ 로그인 에러", be);
 			throw be;
 		} catch (Exception e) {
-			throw new BizException("process_err", e);
+			throw new BizException("error.process", e);
 		}
 		
 		return result;
@@ -380,7 +380,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserList Exception 발생 : {}", e);
-			throw new BizException("inquiry_err", e);
+			throw new BizException("error.inquiry", e);
 		}
 		
 		return result;
@@ -441,7 +441,7 @@ public class UserServiceImpl implements UserService {
 		for(Tuple t : grpList) {
 			DataMap<String, Object> map = new DataMap<>();
 			map.put("grpCd", t.get(QUserGroupEntity.userGroupEntity).getGrpCd());
-			map.put("grpNm", t.get(QGroupEntity.groupEntity).getGrpNm());
+			map.put("grpNm", t.get(QGroupEntity.groupEntity) == null ? "":t.get(QGroupEntity.groupEntity).getGrpNm());
 			userGrpList.add(map);
 		}
 		
@@ -466,7 +466,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserGrpList Exception 발생 : {}", e);
-			throw new BizException("inquiry_err", e);
+			throw new BizException("error.inquiry", e);
 		}
 		
 		return userGrpList;
@@ -502,7 +502,7 @@ public class UserServiceImpl implements UserService {
 			inqResult = userRepository.findOne(conditions);
 			
 			if(inqResult.isEmpty()) {
-				throw new BizException("not_found");
+				throw new BizException("error.data.not-found");
 			} else {
 				UserEntity userEntity = inqResult.get();
 				userInfo = new DataMap<String, Object>();
@@ -523,7 +523,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserInfo Exception 발생 : {}", e);
-			throw new BizException("inquiry_err", e);
+			throw new BizException("error.inquiry", e);
 		}
 		return userInfo;
 	}
@@ -565,7 +565,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserInfo Exception 발생 : {}", e);
-			throw new BizException("inquiry_err", e);
+			throw new BizException("error.inquiry", e);
 		}
 		
 		return result;
@@ -585,7 +585,7 @@ public class UserServiceImpl implements UserService {
 			
 			if(StringUtil.isEmpty(params.getString("uid"))) {
 				log.error("__ERRLOG__ 이용자ID 미입력");
-				throw new BizException("val_required", new String[] {"이용자ID"}); 
+				throw new BizException("error.required", new String[] {"이용자ID"}); 
 			}
 			
 			rs = serviceInvoker.callService("UserService", "inqCntUser", request);
@@ -599,7 +599,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqUserInfo Exception 발생 : {}", e);
-			throw new BizException("inquiry_err", e);
+			throw new BizException("error.inquiry", e);
 		}
 		
 		return result;
@@ -634,17 +634,17 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			if(StringUtil.isEmpty(uid)) {
 				log.error("__ERRLOG__ 이용자ID 미입력");
-				throw new BizException("val_required", new String[] {"이용자ID"}); 
+				throw new BizException("error.required", new String[] {"이용자ID"}); 
 			}
 			
 			if(StringUtil.isEmpty(params.getString("userState"))) {
 				log.error("__ERRLOG__ 이용자상태 미입력");
-				throw new BizException("val_required", new String[] {"이용자상태"}); 
+				throw new BizException("error.required", new String[] {"이용자상태"}); 
 			}
 			
 			if(StringUtil.isEmpty(params.getString("delYn"))) {
 				log.error("__ERRLOG__ 삭제여부 미입력");
-				throw new BizException("val_required", new String[] {"삭제여부"}); 
+				throw new BizException("error.required", new String[] {"삭제여부"}); 
 			}
 			
 			log.debug("__DBGLOG__ 입력값 체크 종료");
@@ -664,7 +664,7 @@ public class UserServiceImpl implements UserService {
 				//삭제된 데이터면 업데이트
 				if(!Constants.YES.equals(userInfo.get().getDelYn())) {
 					log.error("__ERRLOG__ 기등록된 이용자 존재 [{}]", params.getString("uid"));
-					throw new BizException("reg_data_exists_msg", new String[] {StringUtil.concat("이용자ID: ", params.getString("uid"))});
+					throw new BizException("error.regist.data.exists.msg", new String[] {StringUtil.concat("이용자ID: ", params.getString("uid"))});
 				}
 				
 				oldUserState = userEntity.getUserState();
@@ -698,7 +698,7 @@ public class UserServiceImpl implements UserService {
 				userRepository.save(userEntity);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ createUser DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"이용자 정보"},e);
+				throw new BizException("error.regist.prefix", new String[] {"이용자 정보"},e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자 등록 종료");
@@ -718,7 +718,7 @@ public class UserServiceImpl implements UserService {
 				userGroupRepository.save(userGroupEntity);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ createUser DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"이용자 권한"}, e);
+				throw new BizException("error.regist.prefix", new String[] {"이용자 권한"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자권한 등록(일반사용자) 종료");
@@ -754,7 +754,7 @@ public class UserServiceImpl implements UserService {
 				userLogRepository.save(userLogEntity);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ createUser DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"이용자 변경로그"}, e);
+				throw new BizException("error.regist.prefix", new String[] {"이용자 변경로그"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자변경로그 등록 종료");
@@ -767,7 +767,7 @@ public class UserServiceImpl implements UserService {
 			
 			if(userInfo.isEmpty()) {
 				log.error("__ERRLOG__ createUser 등록 후 조회 NOT FOUND");
-				throw new BizException("not_found_msg", new String[] {StringUtil.concat("이용자ID:", uid)});
+				throw new BizException("error.data.not-found.msg", new String[] {StringUtil.concat("이용자ID:", uid)});
 			}
 			
 			userEntity = null;
@@ -789,7 +789,7 @@ public class UserServiceImpl implements UserService {
 			throw be;
 		} catch (Exception e) {
 			log.error("__ERRLOG__ createUser Exception 발생 : {}", e);
-			throw new BizException("reg_error_prefix", new String[] {"이용자"}, e);
+			throw new BizException("error.regist.prefix", new String[] {"이용자"}, e);
 		}
 		
 		return result;
@@ -824,7 +824,7 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			if(StringUtil.isEmpty(uid)) {
 				log.error("__ERRLOG__ 이용자ID 미입력");
-				throw new BizException("val_required", new String[] {"이용자ID"}); 
+				throw new BizException("error.required", new String[] {"이용자ID"}); 
 			}
 			
 			log.debug("__DBGLOG__ 필수값 체크 종료");
@@ -838,7 +838,7 @@ public class UserServiceImpl implements UserService {
 			// 이용자 정보 없으면 오류
 			if(optionalUserInfo.isEmpty()) {
 				log.error("__ERRLOG__ 이용자 미존재 [{}]", uid);
-				throw new BizException("not_found_msg", new String[] {StringUtil.concat("이용자ID: ", uid)});
+				throw new BizException("error.data.not-found.msg", new String[] {StringUtil.concat("이용자ID: ", uid)});
 			} else {
 				userInfo = optionalUserInfo.get();
 			}
@@ -888,7 +888,7 @@ public class UserServiceImpl implements UserService {
 				passwordErrorHistoryRepository.saveAndFlush(pswdErrHistEntity);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ handleInvalidPassword DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"비밀번호 오류내역"}, e);
+				throw new BizException("error.regist.prefix", new String[] {"비밀번호 오류내역"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 비밀번호 오류내역 등록 종료");
@@ -907,7 +907,7 @@ public class UserServiceImpl implements UserService {
 				userRepository.saveAndFlush(userInfo);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ handleInvalidPassword DataAccessException 발생 : {}", e);
-				throw new BizException("chg_error_prefix", new String[] {"이용자 정보"}, e);
+				throw new BizException("error.modify.prefix", new String[] {"이용자 정보"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자 정보 갱신 종료");
@@ -922,7 +922,7 @@ public class UserServiceImpl implements UserService {
 		} catch (BizException be) {
 			throw be;
 		} catch (Exception e) {
-			throw new BizException("process_err", e);
+			throw new BizException("error.process", e);
 		}
 		return result;
 	}
@@ -959,12 +959,12 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			if(StringUtil.isEmpty(uid)) {
 				log.error("__ERRLOG__ 이용자아이디 미입력");
-				throw new BizException("val_required", new String[] {"이용자아이디"}); 
+				throw new BizException("error.required", new String[] {"이용자아이디"}); 
 			}
 			
 			if(StringUtil.isEmpty(params.getString("delYn"))) {
 				log.error("__ERRLOG__ 삭제여부 미입력");
-				throw new BizException("val_required", new String[] {"삭제여부"}); 
+				throw new BizException("error.required", new String[] {"삭제여부"}); 
 			}
 			
 			log.debug("__DBGLOG__ 입력값 체크 종료");
@@ -978,7 +978,7 @@ public class UserServiceImpl implements UserService {
 			// 이용자 정보 없으면 오류
 			if(optionalUserEntity.isEmpty()) {
 				log.error("__ERRLOG__ 이용자 미존재 [{}]", uid);
-				throw new BizException("not_found_msg", new String[] {StringUtil.concat("이용자ID: ", uid)});
+				throw new BizException("error.data.not-found.msg", new String[] {StringUtil.concat("이용자ID: ", uid)});
 			} else {
 				userEntity = optionalUserEntity.get();
 				oldUserState = userEntity.getUserState();
@@ -1010,12 +1010,12 @@ public class UserServiceImpl implements UserService {
 				
 				if(userEntity == null) {
 					log.error("__ERRLOG__ updateUser saveAndFlush null");
-					throw new BizException("chg_error_prefix", new String[] {"이용자정보"});
+					throw new BizException("error.modify.prefix", new String[] {"이용자정보"});
 				}
 				
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ updateUser DataAccessException 발생 : {}", e);
-				throw new BizException("chg_error_prefix", new String[] {"이용자 정보"},e);
+				throw new BizException("error.modify.prefix", new String[] {"이용자 정보"},e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자 수정 종료");
@@ -1051,7 +1051,7 @@ public class UserServiceImpl implements UserService {
 				userLogRepository.saveAndFlush(userLogEntity);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ updateUser DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"이용자 변경로그"}, e);
+				throw new BizException("error.regist.prefix", new String[] {"이용자 변경로그"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자변경로그 등록 종료");
@@ -1065,7 +1065,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ updateUser Exception 발생 : {}", e);
-			throw new BizException("chg_error_prefix", new String[] {"이용자"}, e);
+			throw new BizException("error.modify.prefix", new String[] {"이용자"}, e);
 		}
 		
 		return result;
@@ -1101,7 +1101,7 @@ public class UserServiceImpl implements UserService {
 			//===================================================================================
 			if(StringUtil.isEmpty(uid)) {
 				log.error("__ERRLOG__ 이용자아이디 미입력");
-				throw new BizException("val_required", new String[] {"이용자아이디"}); 
+				throw new BizException("error.required", new String[] {"이용자아이디"}); 
 			}
 
 			log.debug("__DBGLOG__ 입력값 체크 종료");
@@ -1115,14 +1115,14 @@ public class UserServiceImpl implements UserService {
 			// 이용자 정보 없으면 오류
 			if(optionalUserEntity.isEmpty()) {
 				log.error("__ERRLOG__ 이용자 미존재 [{}]", uid);
-				throw new BizException("not_found_msg", new String[] {StringUtil.concat("이용자ID: ", uid)});
+				throw new BizException("error.data.not-found.msg", new String[] {StringUtil.concat("이용자ID: ", uid)});
 			} else {
 				
 				userEntity = optionalUserEntity.get();
 				
 				if(Constants.YES.equals(userEntity.getDelYn())) {
 					log.error("__ERRLOG__ 이미 삭제된 이용자 [{}]", uid);
-					throw new BizException("del_already_msg", new String[] {StringUtil.concat("이용자아이디: ", uid)});
+					throw new BizException("error.delete.already_msg", new String[] {StringUtil.concat("이용자아이디: ", uid)});
 				}
 			}
 			
@@ -1143,12 +1143,12 @@ public class UserServiceImpl implements UserService {
 				
 				if(userEntity == null) {
 					log.error("__ERRLOG__ deleteUser saveAndFlush null");
-					throw new BizException("chg_error_prefix", new String[] {"이용자정보"});
+					throw new BizException("error.modify.prefix", new String[] {"이용자정보"});
 				}
 				
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ deleteUser DataAccessException 발생 : {}", e);
-				throw new BizException("del_error_prefix", new String[] {"이용자 정보"},e);
+				throw new BizException("error.delete.prefix", new String[] {"이용자 정보"},e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자 삭제 종료");
@@ -1184,7 +1184,7 @@ public class UserServiceImpl implements UserService {
 				userLogRepository.saveAndFlush(userLogEntity);
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ deleteUser DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"이용자 변경로그"}, e);
+				throw new BizException("error.regist.prefix", new String[] {"이용자 변경로그"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 이용자변경로그 등록 종료");
@@ -1198,7 +1198,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ deleteUser Exception 발생 : {}", e);
-			throw new BizException("del_error_msg", new String[] {"이용자"}, e);
+			throw new BizException("error.delete.msg", new String[] {"이용자"}, e);
 		}
 		
 		return result;
@@ -1241,7 +1241,7 @@ public class UserServiceImpl implements UserService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ deleteManyUser Exception 발생 : {}", e);
-			throw new BizException("del_error_msg", new String[] {"이용자"}, e);
+			throw new BizException("error.delete.msg", new String[] {"이용자"}, e);
 		}
 		
 		return result;

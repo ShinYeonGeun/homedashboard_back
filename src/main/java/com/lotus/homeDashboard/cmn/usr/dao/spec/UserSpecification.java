@@ -5,7 +5,7 @@ import org.springframework.data.jpa.domain.Specification;
 import com.lotus.homeDashboard.cmn.usr.entity.UserEntity;
 import com.lotus.homeDashboard.common.dao.spec.CommonSpecification;
 
-public class UserSpecification{
+public class UserSpecification {
 	
 	public static Specification<UserEntity> eqUid(String uid) {
 		return (root, query, criteriaBuilder) ->
