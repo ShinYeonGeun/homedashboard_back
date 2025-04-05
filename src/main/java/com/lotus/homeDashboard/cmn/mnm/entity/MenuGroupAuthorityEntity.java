@@ -1,10 +1,11 @@
-package com.lotus.homeDashboard.cmn.usr.entity;
+package com.lotus.homeDashboard.cmn.mnm.entity;
 
 import java.util.List;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import lombok.AllArgsConstructor;
@@ -16,7 +17,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserMenuEntity {
+public class MenuGroupAuthorityEntity {
+	
 	@Id
 	@Column(name="MENU_ID")
 	private int menuId;
@@ -31,7 +33,7 @@ public class UserMenuEntity {
 	private String path;
 	
 	@Column
-	private int seq;
+	private Integer seq;
 	
 	@Column
 	private int level;
@@ -39,6 +41,10 @@ public class UserMenuEntity {
 	@Column(name = "ROOT_MENU_ID")
 	private int rootMenuId;
 	
+	@Column(name = "GRP_CD")
+	private String grpCd;
+	
 	@Transient
-	private List<UserMenuEntity> children;
+	private List<MenuGroupAuthorityEntity> children;
+	
 }

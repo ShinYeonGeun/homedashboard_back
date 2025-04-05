@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import com.lotus.homeDashboard.common.entity.TrnCdEntity;
 
-public interface TrnCdRepository extends JpaRepository<TrnCdEntity, String>, JpaSpecificationExecutor<TrnCdEntity> {
+public interface TrnCdRepository extends JpaRepository<TrnCdEntity, String>, JpaSpecificationExecutor<TrnCdEntity>, TrnCdDslRepository {
 
 }

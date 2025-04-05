@@ -1,8 +1,12 @@
 package com.lotus.homeDashboard.cmn.mnm.service.impl;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -16,12 +20,17 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.lotus.homeDashboard.cmn.mnm.dao.MenuAuthorityGroupRepository;
+import com.lotus.homeDashboard.cmn.mnm.dao.MenuAuthorityLogRepository;
+import com.lotus.homeDashboard.cmn.mnm.dao.MenuAuthorityRepository;
 import com.lotus.homeDashboard.cmn.mnm.dao.MenuRepository;
 import com.lotus.homeDashboard.cmn.mnm.dao.spec.MenuSpecification;
+import com.lotus.homeDashboard.cmn.mnm.entity.MenuAuthorityEntity;
+import com.lotus.homeDashboard.cmn.mnm.entity.MenuAuthorityKeyEntity;
+import com.lotus.homeDashboard.cmn.mnm.entity.MenuAuthorityLogEntity;
 import com.lotus.homeDashboard.cmn.mnm.entity.MenuEntity;
+import com.lotus.homeDashboard.cmn.mnm.entity.MenuGroupAuthorityEntity;
 import com.lotus.homeDashboard.cmn.mnm.service.MenuService;
-import com.lotus.homeDashboard.cmn.usr.dao.UserMenuRepository;
-import com.lotus.homeDashboard.cmn.usr.entity.UserMenuEntity;
 import com.lotus.homeDashboard.common.component.CommonHeader;
 import com.lotus.homeDashboard.common.component.DataMap;
 import com.lotus.homeDashboard.common.component.Request;
@@ -44,7 +53,13 @@ public class MenuServiceImpl implements MenuService {
 	private MenuRepository menuRepository;
 	
 	@Autowired
-	private UserMenuRepository userMenuRepository;
+	private MenuAuthorityGroupRepository menuGroupAuthorityRepository;
+	
+	@Autowired
+	private MenuAuthorityLogRepository menuAuthorityLogRepository;
+	
+	@Autowired
+	private MenuAuthorityRepository menuAuthorityRepository;
 	
 	@Autowired
 	private ServiceInvoker serviceInvoker;
@@ -60,8 +75,8 @@ public class MenuServiceImpl implements MenuService {
 	public List<DataMap<String,Object>> inqUserMenuList(Request request) {
 		
 		List<String> grpCds = null;
-		List<UserMenuEntity> list = null;
-		List<UserMenuEntity> menuList = new ArrayList<>();
+		List<MenuGroupAuthorityEntity> list = null;
+		List<MenuGroupAuthorityEntity> menuList = new ArrayList<>();
 		List<DataMap<String,Object>> result = new ArrayList<>();
 		String uid = request.getParameter().getString("uid", "");
 		
@@ -70,6 +85,7 @@ public class MenuServiceImpl implements MenuService {
 			//grpCds = request.getParameter().get("grpCd") == null ? new ArrayList<>():(List<String>) request.getParameter().get("grpCd");
 			grpCds = request.getParameter().get("grpCd") == null ? new ArrayList<>(): request.getParameter().getList("grpCd");
 		} else {
+			
 			Request userGrpParams = new Request();
 			DataMap<String, Object> userGrpParamMap = new DataMap<>();
 			ResultSet userGrpResult = null;
@@ -94,16 +110,25 @@ public class MenuServiceImpl implements MenuService {
 			grpCds = grpList.stream().map(map -> map.getString("grpCd")).collect(Collectors.toList());
 		}
 		
-		list = userMenuRepository.findUserMenuList(grpCds);
+		list = menuGroupAuthorityRepository.findUserMenuList(grpCds);
+		list  = list.stream()
+                .collect(Collectors.toMap(
+                		MenuGroupAuthorityEntity::getMenuId,   // menuId를 키로 사용
+                        menu -> menu,            // 첫 번째 등장한 엔티티 유지
+                        (existing, replacement) -> existing  // 중복시 기존 값 유지
+                    ))
+                    .values()  // Map의 값들만 추출
+                    .stream()  // 다시 스트림으로 변환
+                    .collect(Collectors.toList());  // 리스트로 변환
 		
-		for(UserMenuEntity e : list) {
-			Stream<UserMenuEntity> stream = list.stream();
+		for(MenuGroupAuthorityEntity e : list) {
+			Stream<MenuGroupAuthorityEntity> stream = list.stream();
 			e.setChildren(stream.filter(i -> i.getUpperMenuId()!= null && e.getMenuId() == i.getUpperMenuId()).toList());
 		}
 		
 		menuList = list.stream().filter(e -> e.getMenuId() == e.getRootMenuId()).toList();
 		
-		for(UserMenuEntity e : menuList) {
+		for(MenuGroupAuthorityEntity e : menuList) {
 			log.debug("__DBGLOG__ 최종 메뉴 목록 :{}", e);
 			result.add(this.userMenuEntityToMap(e));
 		}
@@ -111,7 +136,7 @@ public class MenuServiceImpl implements MenuService {
 		return result;
 	}
 	
-	protected DataMap<String,Object> userMenuEntityToMap(UserMenuEntity entity) {
+	protected DataMap<String,Object> userMenuEntityToMap(MenuGroupAuthorityEntity entity) {
 		
 		DataMap<String,Object> map = new DataMap<>();
 		
@@ -121,10 +146,11 @@ public class MenuServiceImpl implements MenuService {
 		map.put("path", entity.getPath());
 		map.put("seq", entity.getSeq());
 		map.put("level", entity.getLevel());
+		map.put("grpCd", entity.getGrpCd());
 
 		if(entity.getChildren() != null && entity.getChildren().size() > 0) {
 			List<DataMap<String,Object>> children = new ArrayList<>();
-			for(UserMenuEntity e:entity.getChildren()) {
+			for(MenuGroupAuthorityEntity e:entity.getChildren()) {
 				children.add(this.userMenuEntityToMap(e));
 			}
 			
@@ -208,7 +234,7 @@ public class MenuServiceImpl implements MenuService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ inqMenuList Exception 발생 : {}", e);
-			throw new BizException("inquiry_err", e);
+			throw new BizException("error.inquiry", e);
 		}
 		
 		return result;
@@ -250,7 +276,7 @@ public class MenuServiceImpl implements MenuService {
 					entity = optionalEntity.get();
 					if(!Constants.YES.equals(entity.getDelYn())) {
 						log.error("__ERRLOG__ 기등록된 메뉴 존재 [{}]", menuId);
-						throw new BizException("reg_data_exists_msg", new String[] {StringUtil.concat("메뉴: ", String.valueOf(menuId))});
+						throw new BizException("error.regist.data.exists.msg", new String[] {StringUtil.concat("메뉴: ", String.valueOf(menuId))});
 					}
 				} else {
 					entity = new MenuEntity();
@@ -304,7 +330,7 @@ public class MenuServiceImpl implements MenuService {
 				
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ createMenu DataAccessException 발생 : {}", e);
-				throw new BizException("reg_error_prefix", new String[] {"메뉴"}, e);
+				throw new BizException("error.regist.prefix", new String[] {"메뉴"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 메뉴등록 종료");
@@ -318,7 +344,7 @@ public class MenuServiceImpl implements MenuService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ createMenu Exception 발생 : {}", e);
-			throw new BizException("reg_error_prefix", new String[] {"메뉴"}, e);
+			throw new BizException("error.regist.prefix", new String[] {"메뉴"}, e);
 		}
 		
 		return result;
@@ -355,7 +381,7 @@ public class MenuServiceImpl implements MenuService {
 			//===================================================================================
 			if(menuId < 1) {
 				log.error("__ERRLOG__ 메뉴ID 미입력");
-				throw new BizException("val_required", new String[] {"메뉴ID"}); 
+				throw new BizException("error.required", new String[] {"메뉴ID"}); 
 			}
 			
 			log.debug("__DBGLOG__ 입력값 체크 종료");
@@ -368,7 +394,7 @@ public class MenuServiceImpl implements MenuService {
 			
 			if(optionalEntity.isEmpty() || Constants.YES.equals(optionalEntity.get().getDelYn())) {
 				log.error("__ERRLOG__ 등록된 메뉴 미존재 [{}]", menuId);
-				throw new BizException("not_found_msg", new String[] {StringUtil.concat("메뉴ID: ", String.valueOf(menuId))});
+				throw new BizException("error.data.not-found.msg", new String[] {StringUtil.concat("메뉴ID: ", String.valueOf(menuId))});
 			} else {
 				entity = optionalEntity.get();
 			}
@@ -394,12 +420,12 @@ public class MenuServiceImpl implements MenuService {
 				
 				if(entity == null) {
 					log.error("__ERRLOG__ updateMenu saveAndFlush null");
-					throw new BizException("chg_error_prefix", new String[] {"메뉴"});
+					throw new BizException("error.modify.prefix", new String[] {"메뉴"});
 				}
 				
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ updateMenu DataAccessException 발생 : {}", e);
-				throw new BizException("chg_error_prefix", new String[] {"메뉴"}, e);
+				throw new BizException("error.modify.prefix", new String[] {"메뉴"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 메뉴정보수정 종료");
@@ -413,7 +439,7 @@ public class MenuServiceImpl implements MenuService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ updateMenu Exception 발생 : {}", e);
-			throw new BizException("chg_error_prefix", new String[] {"거래코드"}, e);
+			throw new BizException("error.modify.prefix", new String[] {"거래코드"}, e);
 		}
 		
 		return result;
@@ -448,7 +474,7 @@ public class MenuServiceImpl implements MenuService {
 			//===================================================================================
 			if(menuId < 1) {
 				log.error("__ERRLOG__ 메뉴ID 미입력");
-				throw new BizException("val_required", new String[] {"메뉴ID"}); 
+				throw new BizException("error.required", new String[] {"메뉴ID"}); 
 			}
 			
 			log.debug("__DBGLOG__ 메뉴정보조회 시작");
@@ -460,12 +486,12 @@ public class MenuServiceImpl implements MenuService {
 			
 			if(optionalEntity.isEmpty()) {
 				log.error("__ERRLOG__ 등록된 메뉴 미존재 [{}]", menuId);
-				throw new BizException("not_found_msg", new String[] {StringUtil.concat("메뉴ID: ", String.valueOf(menuId))});
+				throw new BizException("error.data.not-found.msg", new String[] {StringUtil.concat("메뉴ID: ", String.valueOf(menuId))});
 			} 
 			
 			if(Constants.YES.equals(optionalEntity.get().getDelYn())) {
 				log.error("__ERRLOG__ 이미 삭제된 메뉴 [{}]", menuId);
-				throw new BizException("del_already_msg", new String[] {StringUtil.concat("메뉴ID: ", String.valueOf(menuId))});
+				throw new BizException("error.delete.already_msg", new String[] {StringUtil.concat("메뉴ID: ", String.valueOf(menuId))});
 			}
 			
 			log.debug("__DBGLOG__ 메뉴정보조회 종료");
@@ -486,12 +512,12 @@ public class MenuServiceImpl implements MenuService {
 				
 				if(entity == null) {
 					log.error("__ERRLOG__ deleteMenu saveAndFlush null");
-					throw new BizException("del_error_prefix", new String[] {"메뉴"});
+					throw new BizException("error.delete.prefix", new String[] {"메뉴"});
 				}
 				
 			} catch (DataAccessException e) {
 				log.error("__ERRLOG__ deleteMenu DataAccessException 발생 : {}", e);
-				throw new BizException("del_error_prefix", new String[] {"메뉴"}, e);
+				throw new BizException("error.delete.prefix", new String[] {"메뉴"}, e);
 			}
 			
 			log.debug("__DBGLOG__ 메뉴정보삭제 종료");
@@ -505,7 +531,7 @@ public class MenuServiceImpl implements MenuService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ deleteMenu Exception 발생 : {}", e);
-			throw new BizException("del_error_prefix", new String[] {"메뉴"}, e);
+			throw new BizException("error.delete.prefix", new String[] {"메뉴"}, e);
 		}
 		
 		return result;
@@ -548,10 +574,225 @@ public class MenuServiceImpl implements MenuService {
 			throw be;	
 		} catch (Exception e) {
 			log.error("__ERRLOG__ deleteManyMenu Exception 발생 : {}", e);
-			throw new BizException("del_error_msg", new String[] {"메뉴"}, e);
+			throw new BizException("error.delete.msg", new String[] {"메뉴"}, e);
 		}
 		
 		return result;
+	}
+
+	@Override
+	public DataMap<String, Object> inqMenusByGroupPermissions(Request request) {
+		
+		DataMap<String, Object> result = null;
+		DataMap<String, Object> params = null;
+		String grpCd = null;
+		List<MenuGroupAuthorityEntity> inqList = null;
+		List<DataMap<String, Object>> menuList = null;
+		
+		try {
+			
+			//===================================================================================
+			// 변수 초기값 세팅
+			//===================================================================================
+			result = new DataMap<>();
+			params = request.getParameter();
+			menuList = new ArrayList<>();
+			grpCd = params.getString("grpCd");
+			
+			//===================================================================================
+			// 필수값 체크
+			//===================================================================================
+			if(StringUtil.isEmpty(grpCd)) {
+				log.error("__ERRLOG__ 그룹코드 미입력");
+				throw new BizException("error.required", new String[] {"grpCd"}); 
+			}
+			
+			//===================================================================================
+			// 거래코드 조회
+			//===================================================================================
+			inqList = menuGroupAuthorityRepository.findMenusByGroupPermissions(grpCd);
+			
+			for(MenuGroupAuthorityEntity e : inqList) {
+				Stream<MenuGroupAuthorityEntity> stream = inqList.stream();
+				e.setChildren(stream.filter(i -> i.getUpperMenuId()!= null && e.getMenuId() == i.getUpperMenuId()).toList());
+			}
+			
+			inqList = inqList.stream().filter(e -> e.getMenuId() == e.getRootMenuId()).toList();
+			
+			for(MenuGroupAuthorityEntity e : inqList) {
+				menuList.add(this.userMenuEntityToMap(e));
+			}
+			
+			//===================================================================================
+			// 출력값 조립
+			//===================================================================================
+			result.put("menuList", menuList);
+			
+		} catch (BizException be) {
+			throw be;	
+		} catch (Exception e) {
+			log.error("__ERRLOG__ inqMenusByGroupPermissions Exception 발생 : {}", e);
+			throw new BizException("error.data.not-found.msg", new String[] {"메뉴"}, e);
+		}
+		
+		return result;
+	}
+
+	@Override
+	public DataMap<String, Object> saveMenusByGroupPermissions(Request request) {
+		
+		DataMap<String, Object> result = null;
+		DataMap<String, Object> params = null;
+		CommonHeader header = null;
+		List<Integer> menuIds = null;
+		List<MenuAuthorityEntity> menuAuthList = null;
+		
+		Set<Integer> newIds = null;
+		Set<Integer> delIds = null;
+		Set<Integer> menuIdSet = null;
+		Set<Integer> menuAuthIdSet = null;
+		
+		MenuAuthorityEntity menuAuthEntity = null;
+		String grpCd = "";
+		
+		try {
+			
+			//===================================================================================
+			// 변수 초기값 세팅
+			//===================================================================================
+			result = new DataMap<>();
+			params = request.getParameter();
+			header = request.getHeader();
+			menuIds = params.getList("menuIds");
+			menuIdSet = new HashSet<>(menuIds);
+			grpCd = params.getString("grpCd");
+			
+			//===================================================================================
+			// 필수값 체크
+			//===================================================================================
+			if(StringUtil.isEmpty(grpCd)) {
+				log.error("__ERRLOG__ 그룹코드 미입력");
+				throw new BizException("error.required", new String[] {"그룹코드"}); 
+			}
+			
+			//===================================================================================
+			// 해당 그룹의 메뉴권한 조회
+			//===================================================================================
+			menuAuthList = menuAuthorityRepository.findAllByGrpCdAndDelYn(grpCd, Constants.NO);
+			menuAuthIdSet = new HashSet<>(menuAuthList.stream().map(item -> item.getMenuId()).collect(Collectors.toList()));
+			log.debug("__DBGLOG__ 권한목록 {}", menuAuthList);
+			
+			//신규 메뉴ID
+			newIds = new HashSet<>(menuIdSet);
+			newIds.removeAll(menuAuthIdSet);
+			
+			log.debug("__DBGLOG__ new권한목록 {}", newIds);
+			
+			//삭제 메뉴ID
+			delIds = new HashSet<>(menuAuthIdSet);
+			delIds.removeAll(menuIdSet);
+			
+			log.debug("__DBGLOG__ 삭제권한목록 {}", delIds);
+			
+			//===================================================================================
+			// 권한 및 로그등록
+			//===================================================================================
+			for(int newId : newIds) {
+				//권한등록
+				menuAuthEntity = new MenuAuthorityEntity();
+				menuAuthEntity.setMenuId(newId);
+				menuAuthEntity.setGrpCd(grpCd);
+				menuAuthEntity.setChgUid(header.getTrnUserId());
+				menuAuthEntity.setChgDtm(header.getCurrDtm());
+				menuAuthEntity.setDelYn(Constants.NO);
+				menuAuthEntity.setLastTrnUUID(header.getUuid());
+				menuAuthEntity.setLastTrnUid(header.getTrnUserId());
+				menuAuthEntity.setLastTrnCd(header.getTrnCd());
+				
+				try {
+					
+					menuAuthorityRepository.saveAndFlush(menuAuthEntity);
+					
+				} catch (DataAccessException e) {
+					log.error("__ERRLOG__ saveMenusByGroupPermissions DataAccessException 발생 : {}", e);
+					throw new BizException("error.delete.prefix", new String[] {"메뉴권한"}, e);
+				}
+				
+				//로그등록
+				saveMenuAuthLog(newId, grpCd, Constants.CHG_TYPE_CD.CREATE.getCode(), header.getCurrDtm(), header.getUuid(), header.getTrnUserId(), header.getTrnCd());
+				
+			}
+			
+			//===================================================================================
+			// 권한삭제 및 로그등록
+			//===================================================================================
+			for(int delId : delIds) {
+				//권한삭제
+				MenuAuthorityKeyEntity key = new MenuAuthorityKeyEntity(delId, grpCd);
+				
+				try {
+					
+					menuAuthorityRepository.deleteById(key);
+					
+				} catch (DataAccessException e) {
+					log.error("__ERRLOG__ saveMenusByGroupPermissions DataAccessException 발생 : {}", e);
+					throw new BizException("error.regist.prefix", new String[] {"메뉴권한"}, e);
+				}
+				
+				//로그등록
+				saveMenuAuthLog(delId, grpCd, Constants.CHG_TYPE_CD.DELETE.getCode(), header.getCurrDtm(), header.getUuid(), header.getTrnUserId(), header.getTrnCd());
+				
+			}
+			
+			//===================================================================================
+			// 출력값 조립
+			//===================================================================================
+			
+		} catch (BizException be) {
+			throw be;	
+		} catch (Exception e) {
+			log.error("__ERRLOG__ saveMenusByGroupPermissions Exception 발생 : {}", e);
+			throw new BizException("error.regist.prefix", new String[] {"메뉴"}, e);
+		}
+		
+		return result;
+	}
+	
+	/**
+	 * 메뉴변경로그 등록
+	 * @param menuId
+	 * @param grpCd
+	 * @param chgTypeCd
+	 * @param uuid
+	 * @param uid
+	 * @param trnCd
+	 */
+	private void saveMenuAuthLog(int menuId, String grpCd, String chgTypeCd, Instant trnDtm, UUID uuid, String uid, String trnCd) {
+		
+		MenuAuthorityLogEntity logEntity = null;
+		int seq = 0;
+		
+		try {
+			
+			seq = menuRepository.findMaxMenuAuthLogSeq(menuId, grpCd);
+			
+			logEntity = new MenuAuthorityLogEntity();
+			logEntity.setMenuId(menuId);
+			logEntity.setGrpCd(grpCd);
+			logEntity.setSeq(++seq);
+			logEntity.setTrnDtm(trnDtm);
+			logEntity.setAuthChgTypeCd(chgTypeCd);
+			logEntity.setLastTrnUUID(uuid);
+			logEntity.setLastTrnUid(uid);
+			logEntity.setLastTrnCd(trnCd);
+			
+			menuAuthorityLogRepository.saveAndFlush(logEntity);
+			
+		} catch (DataAccessException e) {
+			log.error("__ERRLOG__ saveMenuAuthLog DataAccessException 발생 : {}", e);
+			throw new BizException("error.regist.prefix", new String[] {"메뉴권한로그"}, e);
+		}
+		
 	}
 
 }

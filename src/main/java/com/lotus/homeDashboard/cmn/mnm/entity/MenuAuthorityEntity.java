@@ -1,4 +1,6 @@
-package com.lotus.homeDashboard.cmn.usr.entity;
+package com.lotus.homeDashboard.cmn.mnm.entity;
+
+import java.time.Instant;
 
 import com.lotus.homeDashboard.common.component.CommonEntity;
 
@@ -12,20 +14,28 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+
 @Entity
-@Table(name="TUSR12", schema = "hdsbd")
+@Table(name="TCMN04", schema = "hdsbd")
 @Data
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
-@IdClass(UserGroupKeyEntity.class)
-public class UserGroupEntity extends CommonEntity {
+@IdClass(MenuAuthorityKeyEntity.class)
+public class MenuAuthorityEntity extends CommonEntity {
 	
 	@Id
-	private String uid;
+	@Column(name = "MENU_ID")
+	private Integer menuId;
 	
 	@Id
 	@Column(name = "GRP_CD")
 	private String grpCd;
+	
+	@Column(name = "CHG_UID")
+	private String chgUid;
+	
+	@Column(name = "CHG_DTM")
+	private Instant chgDtm;
 	
 }

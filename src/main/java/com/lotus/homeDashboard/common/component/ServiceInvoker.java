@@ -176,7 +176,7 @@ public class ServiceInvoker {
 		} catch (BizException be) {
 			throw be;
 		} catch (Exception e) {
-			throw new BizException("service_invoke_err", e);
+			throw new BizException("error.service.invoke", e);
 		}
 	}
 	
@@ -275,7 +275,7 @@ public class ServiceInvoker {
 		}catch (TimeoutException e) {
 			log.error("__ERRLOG__ invoker Timeout Exception {}", e);
 			future.cancel(true);
-			throw new BizException("service_timeout", e);
+			throw new BizException("error.service.timeout", e);
 		}catch(BizException be) {
 			log.error("__ERRLOG__ invoker111 BizException {}", be);
 			
@@ -288,7 +288,7 @@ public class ServiceInvoker {
 				throw (BizException) e.getCause();
 			}else {
 				log.error("__ERRLOG__ invoker111 ExecutionException {}", e);
-				throw new BizException("service_invoke_err", e);
+				throw new BizException("error.service.invoke", e);
 			}
 		}catch(Exception e) {
 			
@@ -297,7 +297,7 @@ public class ServiceInvoker {
 				throw (BizException) e;
 			}else {
 				log.error("__ERRLOG__ invoker111 Exception {}", e);
-				throw new BizException("service_invoke_err", e);
+				throw new BizException("error.service.invoke", e);
 			}
 		}
 		
@@ -324,12 +324,12 @@ public class ServiceInvoker {
 			if(ive.getTargetException() instanceof BizException) {
 				throw (BizException) ive.getTargetException();
 			}else {
-				throw new BizException("service_invoke_err", ive);
+				throw new BizException("error.service.invoke", ive);
 			}
 			
 		}catch(Exception e) {
 			log.error("__ERRLOG__ invoke 22 Exception ");
-			throw new BizException("service_invoke_err", e);
+			throw new BizException("error.service.invoke", e);
 		}
 		
 		return rs;
@@ -370,12 +370,12 @@ public class ServiceInvoker {
 			if(ive.getTargetException() instanceof BizException) {
 				throw (BizException) ive.getTargetException();
 			}else {
-				throw new BizException("service_invoke_err", ive);
+				throw new BizException("error.service.invoke", ive);
 			}
 			
 		}catch(Exception e) {
 			log.error("__ERRLOG__ invoke 33 Exception ");
-			throw new BizException("service_invoke_err", e);
+			throw new BizException("error.service.invoke", e);
 		}
 		
 		return rs;
@@ -411,7 +411,7 @@ public class ServiceInvoker {
 			if(e instanceof BizException) {
 				throw (BizException) e;
 			}else {
-				throw new BizException("service_invoke_err", e);
+				throw new BizException("error.service.invoke", e);
 			}
 		}
 		
@@ -444,7 +444,7 @@ public class ServiceInvoker {
 			if(e instanceof BizException) {
 				throw (BizException) e;
 			}else {
-				throw new BizException("service_invoke_err", e);
+				throw new BizException("error.service.invoke", e);
 			}
 		}
 		
