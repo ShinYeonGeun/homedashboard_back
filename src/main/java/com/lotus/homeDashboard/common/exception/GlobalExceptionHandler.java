@@ -55,7 +55,7 @@ public class GlobalExceptionHandler {
     	//===================================================================================
     	logEntity = new TrnLogEntity();
     	logEntity.setReqResDstcd(REQ_RES_DSTCD.RES.getCode());
-    	logEntity.setResultCode(ResultCode.ERROR.getCode());
+    	logEntity.setResultCd(ResultCode.ERROR.getCode());
     	logEntity.setUri(header.getRequestUri());
 		logEntity.setIp(header.getRequestIp());
 		logEntity.setTrnCd(header.getTrnCd());

@@ -37,4 +37,5 @@ public class TrnCdEntity extends CommonEntity {
 	
 	@Column(name = "TMOT_MS")
 	private Long tmotMs;
+
 }

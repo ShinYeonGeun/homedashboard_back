@@ -86,7 +86,8 @@ public class TrnCdServiceImpl implements TrnCdService {
 				throw new BadRequestException("header is null");
 			}
 			
-			log.debug("__DBGLOG__ 입력 거래코드: {}", header);
+			log.debug("__DBGLOG__ 공통헤더: {}", header);
+			log.debug("__DBGLOG__ 입력 거래코드: {}", header.getTrnCd());
 			
 			log.debug("----------------------------------------------------------------------------------------------------");
 			log.debug(" 거래코드조회 시작");
@@ -667,7 +668,7 @@ public class TrnCdServiceImpl implements TrnCdService {
 			//===================================================================================
 			if(StringUtil.isEmpty(grpCd)) {
 				log.error("__ERRLOG__ 그룹코드 미입력");
-				throw new BizException("error.required", new String[] {"grpCd"}); 
+				throw new BizException("error.required", new String[] {"그룹코드"}); 
 			}
 			
 			//===================================================================================
