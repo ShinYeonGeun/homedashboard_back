@@ -32,7 +32,7 @@ public class TrnLogEntity {
 	private Instant trnDtm;
 	
 	@Column(name = "RESULT_CD")
-	private String resultCode;
+	private String resultCd;
 	
 	@Column(name = "TRN_CD")
 	private String trnCd;

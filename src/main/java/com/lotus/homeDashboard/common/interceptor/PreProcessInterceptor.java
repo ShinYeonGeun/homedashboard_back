@@ -130,7 +130,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			// 거래로그 엔티티 조립
 			//===================================================================================
 			logEntity.setUid(header.getTrnUserId());
-			logEntity.setResultCode(ResultCode.SUCCESS.getCode());
+			logEntity.setResultCd(ResultCode.SUCCESS.getCode());
 			trnLogService.saveTrnLogWithEntity(logEntity);
 			
 		}catch(JWTVerificationException e) {
@@ -147,7 +147,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 			throw new LoginException(msgKey);
 		}catch(Exception e) {
 			log.error("__ERRLOR__ 전체 선처리 오류", e);
-			logEntity.setResultCode(ResultCode.ERROR.getCode());
+			logEntity.setResultCd(ResultCode.ERROR.getCode());
 			logEntity.setContent(e.toString());
 			trnLogService.saveTrnLogWithEntity(logEntity);
     		throw e;
@@ -232,7 +232,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 				    	
 	        if (ex == null) {
 	        	log.debug("__DBGLOG__ 정상 {}", rs);
-	        	logEntity.setResultCode(rs.getResultCd());
+	        	logEntity.setResultCd(rs.getResultCd());
 	        	trnLogService.saveTrnLogWithEntity(logEntity);
 	        }
 //	    	else {
@@ -247,7 +247,7 @@ public class PreProcessInterceptor implements HandlerInterceptor {
 //	            
 //	            String stackTraceString = sw.toString();
 //	        	
-//	        	logEntity.setResultCode(ResultCode.ERROR.getCode());
+//	        	logEntity.setResultCd(ResultCode.ERROR.getCode());
 //	        	logEntity.setContent(stackTraceString);
 //	        }
 //	        
